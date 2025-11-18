@@ -1,0 +1,29 @@
+# Controlled by `max_width` and `use_small_heuristics` unless otherwise specified.
+# array_width = 60
+# attr_fn_like_width = 70
+# chain_width = 60
+# fn_call_width = 60
+# struct_lit_width = 18
+# struct_variant_width = 35
+
+disable_all_formatting = false
+edition = "2024"
+fn_params_layout = "Tall"
+force_explicit_abi = true
+hard_tabs = false
+match_arm_leading_pipes = "Never"
+match_block_trailing_comma = true
+max_width = 100
+merge_derives = true
+# Any reasonable editor should be able to handle either. Enforcing one format ensures consistent style.
+newline_style = "Unix"
+remove_nested_parens = true
+reorder_imports = true
+reorder_modules = true
+short_array_element_width_threshold = 10
+single_line_if_else_max_width = 50
+single_line_let_else_max_width = 50
+tab_spaces = 4
+use_field_init_shorthand = true
+use_small_heuristics = "Default"
+use_try_shorthand = true
