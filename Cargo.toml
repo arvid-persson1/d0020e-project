@@ -1,0 +1,28 @@
+[workspace]
+resolver = "3"
+members = ["lib"]
+
+[profiles.dev]
+opt-level = 0
+debug = true
+strip = "none"
+debug-assertions = true
+overflow-checks = true
+lto = false
+panic = "unwind"
+incremental = true
+codegen-units = 256
+
+[profiles.release]
+opt-level = 3
+debug = false
+# WARN: May make backtraces less useful. Downgrade to "debuginfo" if needed.
+strip = "symbols"
+debug-assertions = false
+overflow-checks = false
+# PERF: Consider "fat" if performance gain is worth the extra build time.
+lto = "thin"
+# WARN: May make debugging more difficult, but proper logging should make this unnecessary.
+panic = "abort"
+incremental = false
+codegen-units = 16
