@@ -2,5 +2,11 @@
 name = "lib"
 version = "0.1.0"
 edition = "2024"
+description = "\"Product Data Broker\" for the D0020E \"Project in computer science\" course at Luleå University of Technology"
+repository = "https://www.github.com/arvid-persson1/d0020e-project"
+readme = "README.md"
+license = "MIT"
+keywords = ["api", "database", "serde", "parsing", "utility"]
+categories = ["api-bindings", "database"]
 
 [dependencies]
