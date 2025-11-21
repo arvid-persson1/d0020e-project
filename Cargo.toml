@@ -1,8 +1,29 @@
+[package]
+name = "broker"
+version.workspace = true
+edition.workspace = true
+description.workspace = true
+readme.workspace = true
+repository.workspace = true
+license.workspace = true
+keywords.workspace = true
+categories.workspace = true
+
 [workspace]
 resolver = "3"
-members = ["lib"]
+# members = ["mock/*"]
 
-[profiles.dev]
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+description = "\"Product Data Broker\" for the D0020E \"Project in computer science\" course at Luleå University of Technology"
+readme = "README.md"
+repository = "https://www.github.com/arvid-persson1/d0020e-project"
+license = "MIT"
+keywords = ["api", "database", "parsing", "serde", "utility"]
+categories = ["api-bindings", "database"]
+
+[profile.dev]
 opt-level = 0
 debug = true
 strip = "none"
@@ -13,7 +34,7 @@ panic = "unwind"
 incremental = true
 codegen-units = 256
 
-[profiles.release]
+[profile.release]
 opt-level = 3
 debug = false
 # WARN: May make backtraces less useful. Downgrade to "debuginfo" if needed.
