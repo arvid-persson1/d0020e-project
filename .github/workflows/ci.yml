@@ -34,18 +34,11 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: ${{ runner.os }}-cargo-
 
-      - name: Ensure cargo-cranky
-        run: |
-          if ! command cargo-cranky >/dev/null 2>&1; then
-            echo "Installing cargo-cranky..."
-            cargo install cargo-cranky
-          fi
-
       - name: Format
         run: cargo fmt -- --check
 
       - name: Lint
-        run: cargo cranky
+        run: cargo clippy
 
       - name: Test
         run: cargo test --verbose
