@@ -1,0 +1,21 @@
+[formatting]
+align_comments = true
+align_entries = false
+allowed_blank_lines = 1
+array_auto_collapse = true
+array_auto_expand = true
+array_trailing_comma = true
+column_width = 100
+compact_arrays = true
+compact_entries = false
+compact_inline_tables = false
+# Any reasonable editor should be able to handle either. Enforcing one format ensures consistent style.
+crlf = false
+indent_string = "    "
+indent_tables = false
+inline_table_expand = true
+reorder_arrays = true
+reorder_inline_tables = true
+# Does not mess with grouping of lint levels as long as each section starts with a comment.
+reorder_keys = true
+trailing_newline = true
