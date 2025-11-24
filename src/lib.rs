@@ -1,7 +1,7 @@
 //! The data broker.
 
 use async_trait::async_trait;
-use futures::{stream::iter as from_iter, Stream};
+use futures::{Stream, stream::iter as from_iter};
 
 /// Trait for a source of data.
 ///
