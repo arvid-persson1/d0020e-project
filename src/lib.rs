@@ -1,9 +1,9 @@
 //! The data broker.
 
 use futures::{
-    future::{err, BoxFuture},
-    stream::{iter as from_iter, once, BoxStream},
     FutureExt as _, StreamExt as _, TryFutureExt as _, TryStreamExt as _,
+    future::{BoxFuture, err},
+    stream::{BoxStream, iter as from_iter, once},
 };
 use std::io::Error as IoError;
 use thiserror::Error;
