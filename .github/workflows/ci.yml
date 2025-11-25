@@ -40,5 +40,8 @@ jobs:
       - name: Lint
         run: cargo clippy
 
+      - name: Docs
+        run: cargo rustdoc -- -Z unstable-options --check
+
       - name: Test
         run: cargo test --verbose
