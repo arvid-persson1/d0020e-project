@@ -1,9 +1,9 @@
 //! The data broker.
 
 use futures::{
+    future::{err, BoxFuture},
+    stream::{iter as from_iter, once, BoxStream},
     FutureExt as _, StreamExt as _, TryFutureExt as _, TryStreamExt as _,
-    future::{BoxFuture, err},
-    stream::{BoxStream, iter as from_iter, once},
 };
 use std::io::Error as IoError;
 use thiserror::Error;
@@ -126,18 +126,17 @@ pub trait Source<'a, T>: Sized {
     /// correctness or omitting bounds checks in usane code; implementations may return incorrect
     /// bounds.
     ///
-    /// The default implementation returns <code>[Ok]((0, [None]))</code> which is always correct though
+    /// This method is not intended to actually connect to the source, and as such does not return
+    /// a [`Result`] nor a [`Future`].
+    ///
+    /// The default implementation returns <code>(0, [None])</code> which is always correct though
     /// minimally specific.
     #[allow(
         unused_variables,
         reason = "Avoids raising `clippy::renamed_function_params` in implementors."
     )]
-    #[allow(
-        clippy::missing_errors_doc,
-        reason = "Trait method expected to be overridden."
-    )]
-    fn size_hint(self, query: Self::Query) -> Result<(usize, Option<usize>), ConnectorError> {
-        Ok((0, None))
+    fn size_hint(self, query: Self::Query) -> (usize, Option<usize>) {
+        (0, None)
     }
 }
 
