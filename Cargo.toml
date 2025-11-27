@@ -52,8 +52,9 @@ incremental = false
 panic = "abort"
 
 [dependencies]
+error_set = "0.9.0"
 futures = "0.3.31"
-thiserror = "2.0.17"
+reqwest = "0.12.24"
 
 [workspace.lints.rust]
 # Core language features and proper use of common APIs.
