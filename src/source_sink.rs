@@ -20,10 +20,11 @@ pub trait Source<'a, T>: Sized {
 
     /// Fetch all data matching the query as a stream.
     ///
-    /// The default implementation calls [`fetch_all`](Self::fetch_all) and creates a stream from
-    /// the vector consisting either of entirely [`Ok`] values, or a single [`Err`] value. This
-    /// means that implementors **must** override this function unless they instead override
-    /// [`fetch_all`].
+    /// The default implementation calls [`fetch_all`] and creates a stream from the vector
+    /// consisting either of entirely [`Ok`] values, or a single [`Err`] value. This means that
+    /// implementors **must** override this function unless they instead override [`fetch_all`].
+    ///
+    /// [`fetch_all`]: Self::fetch_all
     // `Unpin` is needed to support this default implementation of `fetch_optional`. This bound is
     // likely to be less restrictive than the alternative, see comment below.
     // TODO: Is a default implementation that imposes neither restriction possible?
@@ -62,7 +63,7 @@ pub trait Source<'a, T>: Sized {
     }
 
     /// Fetch a single entry matching the query. If no such entry exists,
-    /// <code>[Err]\([`NoSuchEntry`](Connector::NoSuchEntry))</code> is returned.
+    /// <code>[Err]\([`NoSuchEntry`](FetchOneError::NoSuchEntry))</code> is returned.
     ///
     /// This method poses no restriction on *which* entry should be returned, only that it should
     /// be one matching the query. The query might however define an ordering.
