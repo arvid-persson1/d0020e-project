@@ -2,7 +2,7 @@
 
 use reqwest::Error as ReqwestError;
 use serde::de::value::Error as DeserializeError;
-use std::{error::Error, io::Error as IoError};
+use std::{error::Error, fmt::Error as FmtError, io::Error as IoError};
 use thiserror::Error;
 use transitive::Transitive;
 
@@ -26,6 +26,18 @@ pub enum ConnectionError {
     /// An IO error.
     #[error(transparent)]
     Io(#[from] IoError),
+    /// Connection timed out.
+    #[error("Connection timed out.")]
+    TimedOut,
+    /// Redirect limit was reached or cyclic redirect detected.
+    #[error("Redirect limit was reached or cyclic redirect detected.")]
+    Redirect,
+    /// A message was received that could not be processed. It might be an issue with encoding,
+    /// charset used, or that an external resource communicated using an unknown format. This
+    /// should not be confused with [`DecodeStreamError::Decode`] or [`DecodeOneError::Decode`],
+    /// which are raised when parsing a message that was successfully received.
+    #[error(transparent)]
+    Decode(BoxError),
 }
 
 impl From<ReqwestError> for ConnectionError {
@@ -85,6 +97,12 @@ pub enum SendError {
     Connection(#[from] ConnectionError),
 }
 
+impl From<FmtError> for SendError {
+    fn from(value: FmtError) -> Self {
+        Self::Encode(Box::new(value))
+    }
+}
+
 /// Errors that may occur when decoding data from a stream. Created by
 /// [`decode`](crate::rest::Decode::decode).
 #[derive(Debug, Error)]
@@ -124,5 +142,50 @@ impl From<DecodeOneError> for FetchOneError {
             DecodeOneError::Decode(err) => Self::Fetch(err.into()),
             DecodeOneError::Empty => Self::NoSuchEntry,
         }
+    }
+}
+
+/// Classify a [`reqwest::Error`].
+///
+/// `reqwest` provides a single error type which is used by the entire crate. It exposes few
+/// methods and all of its fields are private. This means that it is generally difficult to
+/// properly classify it and impossible to extract useful debug information other than possibly in
+/// its error message. That being said, this function handles some cases and maps them to known
+/// [`ConnectionError`]s.
+///
+/// # Panics
+///
+/// Panics if for the given error, [`reqwest::Error::is_builder`] is true as those should be
+/// handled in advance, when returned from the corresponding `build` method. It also panics if
+/// [`reqwest::Error::is_status`] is true as `reqwest::Response::error_for_status` (and the `_ref`)
+/// variant should be avoided in favor of passing the error directly to this function which
+/// identifies the HTTP error and maps it to [`ConnectionError::Http`].
+#[must_use]
+pub fn classify_reqwest<E>(err: ReqwestError) -> E
+where
+    E: From<ConnectionError> + From<ReqwestError>,
+{
+    // Builder errors should be handled separately.
+    assert!(!err.is_builder());
+    // `Response::error_for_status` (`_ref`) shouldn't be used as HTTP errors are included as their
+    // own variant.
+    assert!(!err.is_status());
+
+    if err.is_body() || err.is_decode() {
+        ConnectionError::Decode(Box::new(err)).into()
+    } else if err.is_redirect() {
+        ConnectionError::Redirect.into()
+    } else if err.is_timeout() {
+        ConnectionError::TimedOut.into()
+    } else if let Some(status) = err.status() {
+        ConnectionError::Http {
+            code: status.into(),
+            source: Box::new(err),
+        }
+        .into()
+    } else {
+        // Reqwest allows errors to have none of these properties.
+        // This case also covers `ReqwestError::is_connect` and `ReqwestError::is_request`.
+        err.into()
     }
 }
