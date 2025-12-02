@@ -11,9 +11,9 @@ use futures::{
 /// This trait provides several ways of fetching data regarding how much data is returned at a
 /// time. These all have intraconnected default implementations, which means that although no
 /// methods are marked as "required", **an implementation must override at minimum either `fetch`
-/// or `fetch_all`**, otherwise calls will always fail due to stack overflow or out-of-memory
-/// errors. That being said, often more efficient implementations of the other methods are
-/// possible. Check the method documentations for more information.
+/// or `fetch_all`**, otherwise calls will always fail. That being said, often more efficient
+/// implementations of the other methods are possible. Check the method documentations for more
+/// information.
 pub trait Source<'a, T>: Sized {
     /// Data to be passed along with a request.
     type Query;
@@ -87,7 +87,7 @@ pub trait Source<'a, T>: Sized {
     /// This method poses no restriction on *which* entry should be returned, only that it should
     /// be one matching the query. The query might however uniquely identify one.
     ///
-    /// The defualt implementation calls [`fetch`](Self::fetch) and returns the first item.
+    /// The default implementation calls [`fetch`](Self::fetch) and returns the first item.
     fn fetch_optional<'s>(
         self,
         query: Self::Query,
@@ -140,14 +140,14 @@ pub trait Sink<'a, T>: Sized {
     /// Send data from a stream.
     ///
     /// The default implementation collects the entries and calls [`send_all`](Self::send_all).
-    fn send<'s, S>(self, entries: S) -> impl Future<Output = Result<(), SendError>> + Send + 's
+    fn send<'s, I>(self, entries: I) -> impl Future<Output = Result<(), SendError>> + Send + 's
     where
         Self: Send + 's,
-        S: Stream<Item = T> + Send + 's,
+        I: IntoIterator<Item = T> + Send + 's,
         T: Send,
     {
         async move {
-            let buf = entries.collect::<Vec<_>>().await;
+            let buf = entries.into_iter().collect::<Vec<_>>();
             self.send_all(&buf).await
         }
         // entries.collect::<Vec<_>>().then(|v| self.send_all(&v))
@@ -158,8 +158,12 @@ pub trait Sink<'a, T>: Sized {
     // capture `T` by value while `send_all` can only produce `&T` without placing a `Clone`
     // restriction on `T`. Additionally, `send` couldn't accept a stream of `&T` as `Stream`
     // doesn't define a lifetime parameter.
-    fn send_all<'s>(self, entries: &[T])
-    -> impl Future<Output = Result<(), SendError>> + Send + 's;
+    fn send_all<'s>(
+        self,
+        entries: &'s [T],
+    ) -> impl Future<Output = Result<(), SendError>> + Send + 's
+    where
+        'a: 's;
 
     /// Send a single entry.
     ///
