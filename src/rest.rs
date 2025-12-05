@@ -1,136 +1,14 @@
 //! Connector for REST APIs.
 
 use crate::{
-    errors::{
-        ConnectionError, DecodeOneError, DecodeStreamError, FetchError, FetchOneError, SendError,
-        classify_reqwest,
-    },
-    source_sink::{Sink, Source},
+    connector::{Sink, Source},
+    encode::{Decode, Encode},
+    errors::{ConnectionError, FetchError, FetchOneError, SendError, classify_reqwest},
 };
-use bytes::{Bytes, BytesMut};
-use futures::{Stream, StreamExt as _, TryStreamExt as _, stream::iter as from_iter};
+use futures::{Stream, StreamExt as _};
 use reqwest::{Body, Client, Error as ReqwestError, IntoUrl, Response, Url};
-use serde::{Serialize, de::value::Error as DeserializeError};
-use std::{fmt::Error as FmtError, io::Error as IoError, marker::PhantomData};
-
-/// A type that can decode data from bytes.
-///
-/// This trait provides several ways of decoding data regarding how many bytes are returned at a
-/// time. The [`decode`] method is `async` to work with data that is produced in real time while
-/// the others expect all bytes in advance.
-///
-/// A decoder is generally stateless, e.g. one for JSON, meaning they will practically often be
-/// ZSTs. However, all methods have conservatively been made to accept `&mut self` to allow for
-/// stateful decoders.
-#[allow(
-    clippy::missing_errors_doc,
-    reason = "Default implementations only delegate errors and do not raise their own."
-)]
-pub trait Decode<T> {
-    /// Decode data from a stream of bytes.
-    ///
-    /// An error may be raised for each item produced, or before any are. Reasonably,
-    /// [`DecodeStreamError::Connection`] should only passed on from input; decoding should not
-    /// produce new connection errors, though this is not enforced.
-    ///
-    /// The default implementation collects the bytes and calls [`decode_all`].
-    fn decode<S>(
-        &mut self,
-        bytes: S,
-    ) -> impl Future<
-        Output = Result<
-            impl Stream<Item = Result<T, DecodeStreamError>> + Send + Unpin,
-            DecodeStreamError,
-        >,
-    > + Send
-    where
-        Self: Send,
-        T: Send,
-        S: Stream<Item = Result<Bytes, ConnectionError>> + Send,
-    {
-        // TODO: This should be possible to implement without creating an `async` closure.
-        async move {
-            let buf = bytes.try_collect::<BytesMut>().await?;
-            self.decode_all(&buf)
-                .map(|vec| from_iter(vec.into_iter().map(Ok)))
-                .map_err(Into::into)
-        }
-    }
-
-    /// Decode data from a slice.
-    ///
-    /// This method intentionally does not have a default implementation based on [`decode`]. This
-    /// is partly because that method is `async` while this one isn't, meaning it would have to
-    /// make explicit blocking calls, unexpectedly leading to poor concurrency and possibly
-    /// performance. It would also require enforcing the contract on that method about not creating
-    /// new connection errors, since this method cannot return one.
-    fn decode_all(&mut self, bytes: &[u8]) -> Result<Vec<T>, DeserializeError>;
-
-    /// Decode a single entry from a slice. If the slice is empty or represents an empty
-    /// collection, <code>[Err]\([`Empty`](DeserializeError::Empty))</code> is returned.
-    ///
-    /// One entry is assumed to be fairly small such that collection all bytes into a slice is
-    /// acceptable, and as such no stream variant of this method exists.
-    ///
-    /// The default implementation calls [`decode_optional`].
-    fn decode_one(&mut self, bytes: &[u8]) -> Result<T, DecodeOneError> {
-        self.decode_optional(bytes)?.ok_or(DecodeOneError::Empty)
-    }
-
-    /// Decode a single entry from a slice, if one exists.
-    ///
-    /// This method poses no restriction on *which* entry should be returned. The format may
-    /// however define an ordering.
-    ///
-    /// One entry is assumed to be fairly small such that collection all bytes into a slice is
-    /// acceptable, and as such no stream variant of this method exists.
-    fn decode_optional(&mut self, bytes: &[u8]) -> Result<Option<T>, DeserializeError>;
-}
-
-/// A type that can encode data as bytes.
-///
-/// This trait provides several ways of encoding data regarding how many entries are processes at a
-/// time.
-///
-/// An encoder is generally stateless, e.g. one for JSON, meaning they will practically often be
-/// ZSTs. However, all methods have conservatively been made to accept `&mut self` to allow for
-/// stateful decoders.
-#[allow(
-    clippy::missing_errors_doc,
-    reason = "Default implementations only delegate errors and do not raise their own."
-)]
-pub trait Encode<T> {
-    /// Encode data from an iterator.
-    ///
-    /// This method intentionally returns all bytes at once, rather than an iterator, as many
-    /// formats (e.g. JSON) require not only headers but also footers (such as closing a list in
-    /// JSON). Returning header data and waiting for a footer leaves any intermediate state as
-    /// invalid encoding, and omitting header data means even the final result is invalid.
-    ///
-    /// The default implementation collects the entries and calls [`encode_all`].
-    fn encode<I>(&mut self, entries: I) -> Result<Box<[u8]>, FmtError>
-    where
-        I: IntoIterator<Item = T>,
-    {
-        self.encode_all(&entries.into_iter().collect::<Box<_>>())
-    }
-
-    /// Encode data from a slice.
-    ///
-    /// Depending on the format, this may or may not be equivalent to calling `encode_one` on
-    /// several entries and concatenating the results.
-    // `encode_all` cannot have a default implementation based on `encode` as it
-    // captures `T` by value while `encode_all` can only produce `&T` without placing a `Clone`
-    // restriction on `T`. Additionally, `encode` couldn't accept an iterator of `&T` as `Iterator`
-    // doesn't define a lifetime parameter.
-    fn encode_all(&mut self, entries: &[T]) -> Result<Box<[u8]>, FmtError>;
-
-    /// Encode a single entry.
-    ///
-    /// Depending on the format, calling this several times and concatenating the results may or
-    /// may not be equivalent to calling `encode_all`.
-    fn encode_one(&mut self, entry: T) -> Result<Box<[u8]>, FmtError>;
-}
+use serde::Serialize;
+use std::{io::Error as IoError, marker::PhantomData};
 
 /// A connector to work with REST APIs.
 ///
@@ -231,7 +109,7 @@ where
     /// If the request fails, returns the error as classified by [`classify_reqwest`].
     async fn fetch_impl(&self, query: Q) -> Result<Response, FetchError>
     where
-        Q: Serialize + Send,
+        Q: Serialize,
         D: Decode<T>,
     {
         // `RequestBuilder::build` also fails is the URL cannot be parsed. Although
@@ -246,7 +124,10 @@ where
         self.client.execute(request).await.map_err(classify_reqwest)
     }
 
-    #[expect(clippy::missing_panics_doc, reason = "Panic should not occur here.")]
+    #[expect(
+        clippy::missing_panics_doc,
+        reason = "Panic should not occur here. See comment."
+    )]
     /// Helper to use for [`Sink`] implementation.
     ///
     /// # Errors
@@ -257,8 +138,8 @@ where
         B: Into<Body> + Send,
     {
         // `RequestBuilder::build` fails is the URL cannot be parsed. Although
-        // `<Url as IntoUrl>::into_url` can fail, it has already been validated that this is not
-        // the case. Hence, this shouldn't fail.
+        // `<Url as IntoUrl>::into_url` can fail, it has already been validated during construction
+        // that this is not the case. Hence, this shouldn't fail.
         let request = self
             .client
             .put(self.sink_url.clone())
@@ -269,10 +150,6 @@ where
     }
 }
 
-#[expect(
-    unused_lifetimes,
-    reason = "Lifetimes required by trait declaration, but unnecessary for current implementation where outputs do not borrow `self`."
-)]
 impl<'a, T, Q, E, D> Source<'a, T> for &'a mut Rest<T, Q, E, D>
 where
     T: Sync,
@@ -282,7 +159,7 @@ where
 {
     type Query = Q;
 
-    async fn fetch<'s>(
+    async fn fetch(
         self,
         query: Self::Query,
     ) -> Result<impl Stream<Item = Result<T, FetchError>> + Send + Unpin, FetchError>
@@ -303,31 +180,28 @@ where
             .map_err(Into::into)
     }
 
-    async fn fetch_all<'s>(self, query: Self::Query) -> Result<Vec<T>, FetchError> {
+    async fn fetch_all(self, query: Self::Query) -> Result<Vec<T>, FetchError> {
         let bytes = self.fetch_impl(query).await?.bytes().await?;
         self.decoder.decode_all(&bytes).map_err(Into::into)
     }
 
-    async fn fetch_one<'s>(self, query: Self::Query) -> Result<T, FetchOneError> {
+    async fn fetch_one(self, query: Self::Query) -> Result<T, FetchOneError> {
         let bytes = self.fetch_impl(query).await?.bytes().await?;
         self.decoder.decode_one(&bytes).map_err(Into::into)
     }
 }
 
-#[expect(
-    unused_lifetimes,
-    reason = "Lifetimes required by trait declaration, but unnecessary for current implementation where outputs do not borrow `self`."
-)]
-impl<'a, T, Q, E, D> Sink<'a, T> for &'a mut Rest<T, Q, E, D>
+impl<T, Q, E, D> Sink<T> for Rest<T, Q, E, D>
 where
     T: Send + Sync,
-    Q: Send + Sync,
-    E: Encode<T> + Send + Sync,
-    D: Send + Sync,
+    Q: Sync,
+    E: Encode<T> + Sync,
+    D: Sync,
 {
-    async fn send<'s, I>(self, entries: I) -> Result<(), SendError>
+    async fn send<'s, I>(&self, entries: I) -> Result<(), SendError>
     where
-        I: IntoIterator<Item = T>,
+        T: 's,
+        I: IntoIterator<Item = &'s T>,
     {
         let body = self.encoder.encode(entries)?;
         self.send_impl(Vec::from(body))
@@ -336,10 +210,8 @@ where
             .map_err(Into::into)
     }
 
-    async fn send_all<'s>(self, entries: &'s [T]) -> Result<(), SendError>
-    where
-        'a: 's,
-    {
+    async fn send_all(&self, entries: &[T]) -> Result<(), SendError>
+where {
         let body = self.encoder.encode_all(entries)?;
         self.send_impl(Vec::from(body))
             .await
@@ -347,7 +219,7 @@ where
             .map_err(Into::into)
     }
 
-    async fn send_one<'s>(self, entry: T) -> Result<(), SendError> {
+    async fn send_one(&self, entry: &T) -> Result<(), SendError> {
         let body = self.encoder.encode_one(entry)?;
         self.send_impl(Vec::from(body))
             .await

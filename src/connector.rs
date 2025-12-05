@@ -5,15 +5,19 @@ use futures::{
     FutureExt as _, Stream, StreamExt as _, TryFutureExt as _, TryStreamExt,
     stream::iter as from_iter,
 };
+use std::array::from_ref;
 
 /// A type that can provide data given some query.
 ///
+/// This trait is intended to be implemented on reference types, and as such most methods consume
+/// `self`.
+///
 /// This trait provides several ways of fetching data regarding how much data is returned at a
 /// time. These all have intraconnected default implementations, which means that although no
-/// methods are marked as "required", **an implementation must override at minimum either `fetch`
-/// or `fetch_all`**, otherwise calls will always fail. That being said, often more efficient
-/// implementations of the other methods are possible. Check the method documentations for more
-/// information.
+/// methods are marked as "required", **an implementation must override at minimum either
+/// [`fetch`](Self::fetch) or [`fetch_all`](Self::fetch_all)**, otherwise calls will always fail.
+/// That being said, often more efficient implementations of the other methods are possible. Check
+/// the method documentations for more information.
 pub trait Source<'a, T>: Sized {
     /// Data to be passed along with a request.
     type Query;
@@ -28,17 +32,14 @@ pub trait Source<'a, T>: Sized {
     // `Unpin` is needed to support this default implementation of `fetch_optional`. This bound is
     // likely to be less restrictive than the alternative, see comment below.
     // TODO: Is a default implementation that imposes neither restriction possible?
-    fn fetch<'s>(
+    fn fetch(
         self,
         query: Self::Query,
     ) -> impl Future<
         Output = Result<impl Stream<Item = Result<T, FetchError>> + Send + Unpin, FetchError>,
     > + Send
-    + 's
     where
-        'a: 's,
-        Self: 's,
-        T: Send + 's,
+        T: Send,
     {
         self.fetch_all(query)
             .map(move |res| res.map(|vec| from_iter(vec.into_iter().map(Ok))))
@@ -47,17 +48,15 @@ pub trait Source<'a, T>: Sized {
     /// Fetch all data matching the query.
     ///
     /// The default implementation calls [`fetch`] and collects the results. This means that
-    /// **must** override this function unless they instead override [`fetch`].
+    /// implementors **must** override this function unless they instead override [`fetch`].
     ///
     /// [`fetch`]: Self::fetch
-    fn fetch_all<'s>(
+    fn fetch_all(
         self,
         query: Self::Query,
-    ) -> impl Future<Output = Result<Vec<T>, FetchError>> + Send + 's
+    ) -> impl Future<Output = Result<Vec<T>, FetchError>> + Send
     where
-        'a: 's,
-        Self: 's,
-        T: Send + 's,
+        T: Send,
     {
         self.fetch(query).and_then(TryStreamExt::try_collect)
     }
@@ -65,18 +64,14 @@ pub trait Source<'a, T>: Sized {
     /// Fetch a single entry matching the query. If no such entry exists,
     /// <code>[Err]\([`NoSuchEntry`](FetchOneError::NoSuchEntry))</code> is returned.
     ///
-    /// This method poses no restriction on *which* entry should be returned, only that it should
-    /// be one matching the query. The query might however define an ordering.
+    /// This method imposes no restriction on *which* entry should be returned, only that it should
+    /// be one matching the query. The query might however uniquely identify one.
     ///
     /// The default implementation calls [`fetch_optional`](Self::fetch_optional).
-    fn fetch_one<'s>(
-        self,
-        query: Self::Query,
-    ) -> impl Future<Output = Result<T, FetchOneError>> + Send + 's
+    fn fetch_one(self, query: Self::Query) -> impl Future<Output = Result<T, FetchOneError>>
     where
-        'a: 's,
-        Self: 's,
-        T: Send + 's,
+        Self: 'a,
+        T: Send + 'a,
     {
         self.fetch_optional(query)
             .map(|res| res?.ok_or(FetchOneError::NoSuchEntry))
@@ -84,14 +79,14 @@ pub trait Source<'a, T>: Sized {
 
     /// Fetch a single entry matching the query, if one exists.
     ///
-    /// This method poses no restriction on *which* entry should be returned, only that it should
+    /// This method imposes no restriction on *which* entry should be returned, only that it should
     /// be one matching the query. The query might however uniquely identify one.
     ///
     /// The default implementation calls [`fetch`](Self::fetch) and returns the first item.
     fn fetch_optional<'s>(
         self,
         query: Self::Query,
-    ) -> impl Future<Output = Result<Option<T>, FetchError>> + Send + 's
+    ) -> impl Future<Output = Result<Option<T>, FetchError>>
     where
         'a: 's,
         Self: 's,
@@ -120,15 +115,16 @@ pub trait Source<'a, T>: Sized {
     /// bounds.
     ///
     /// This method is not intended to actually connect to the source, and as such does not return
-    /// a [`Result`] nor a [`Future`].
+    /// a [`Result`] nor a [`Future`]. It also shouldn't need to consume neither `self` (as it
+    /// would render the method pointless), nor `query`, so they are both borrowed.
     ///
     /// The default implementation returns <code>(0, [None])</code> which is always correct though
     /// minimally specific.
-    #[allow(
+    #[expect(
         unused_variables,
         reason = "Avoids raising `clippy::renamed_function_params` in implementors."
     )]
-    fn size_hint(&self, query: Self::Query) -> (usize, Option<usize>) {
+    fn size_hint(&self, query: &Self::Query) -> (usize, Option<usize>) {
         (0, None)
     }
 }
@@ -136,48 +132,66 @@ pub trait Source<'a, T>: Sized {
 /// A type that can accept data.
 ///
 /// This trait provides several ways of sending data regarding how much data is sent at a time.
-pub trait Sink<'a, T>: Sized {
+/// These have intraconnected default implementations, which means that although no methods are
+/// marked as "required", **an implementation must override at minimum either
+/// [`send`](Self::send), [`send_all`](Self::send_all) or [`send_one`](Self::send_one)**,
+/// otherwise calls will always fail. That being said, often more efficient implementations of
+/// other methods are possible. Check the method documentations for more information.
+pub trait Sink<T> {
     /// Send data from a stream.
     ///
-    /// The default implementation collects the entries and calls [`send_all`](Self::send_all).
-    fn send<'s, I>(self, entries: I) -> impl Future<Output = Result<(), SendError>> + Send + 's
+    /// The default implementation calls [`send_one`] for each element of the stream. This means
+    /// that implementors **must** override this function unless they instead override
+    /// [`send_one`] or its dependencies.
+    ///
+    /// Extra care should be taken when calling this method on a type that does not override the
+    /// default implementations, as sending each entry individually may be either very
+    /// computationally expensive or may require a lot of waiting (e.g. on network requests).
+    ///
+    /// [`send_one`]: Self::send_one
+    fn send<'s, I>(&self, entries: I) -> impl Future<Output = Result<(), SendError>> + Send
     where
-        Self: Send + 's,
-        I: IntoIterator<Item = T> + Send + 's,
-        T: Send,
+        Self: Sync,
+        // This `Send` bound is not actually required for this default implementation. It has been
+        // imposed here to facilitate many implementations, avoiding requiring them to "define the
+        // iterator type in advance" (on the `impl` block) to place additional bounds on it. The
+        // additional bound is currently considered not too much of a restriction.
+        I: IntoIterator<Item = &'s T> + Send,
+        I::IntoIter: Send,
+        T: Sync + 's,
     {
-        async move {
-            let buf = entries.into_iter().collect::<Vec<_>>();
-            self.send_all(&buf).await
-        }
-        // entries.collect::<Vec<_>>().then(|v| self.send_all(&v))
+        from_iter(entries)
+            .then(|entry| self.send_one(entry))
+            .try_collect()
     }
 
     /// Send all data from a slice.
-    // `send_all` cannot have a default implementation based on `send` or `send_one` as they
-    // capture `T` by value while `send_all` can only produce `&T` without placing a `Clone`
-    // restriction on `T`. Additionally, `send` couldn't accept a stream of `&T` as `Stream`
-    // doesn't define a lifetime parameter.
-    fn send_all<'s>(
-        self,
-        entries: &'s [T],
-    ) -> impl Future<Output = Result<(), SendError>> + Send + 's
+    ///
+    /// The default implementation calls [`send`] with an iterator created from the slice. This
+    /// means that implementors **must** override this function unless they instead override
+    /// [`send`] or its dependencies.
+    ///
+    /// [`send`]: Self::send
+    fn send_all(&self, entries: &[T]) -> impl Future<Output = Result<(), SendError>> + Send
     where
-        'a: 's;
+        Self: Sync,
+        T: Sync,
+    {
+        self.send(entries)
+    }
 
     /// Send a single entry.
     ///
-    /// The default implementation calls [`send_all`](Self::send_all) with a slice containing only
-    /// `entry`.
-    fn send_one<'s>(self, entry: T) -> impl Future<Output = Result<(), SendError>> + Send + 's
+    /// The default implementation calls [`send_all`] with a slice containing only `entry`. This
+    /// means that implementors **must** override this function unless they instead override
+    /// [`send_all`] or its dependencies.
+    ///
+    /// [`send_all`]: Self::send_all
+    fn send_one(&self, entry: &T) -> impl Future<Output = Result<(), SendError>> + Send
     where
-        Self: Send + 's,
-        T: Send + 's,
+        Self: Sync,
+        T: Sync,
     {
-        async move {
-            let buf = vec![entry];
-            self.send_all(&buf).await
-        }
-        // self.send_all(&[entry])
+        self.send_all(from_ref(entry))
     }
 }
