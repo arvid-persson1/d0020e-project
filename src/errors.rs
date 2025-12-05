@@ -51,7 +51,7 @@ impl From<ReqwestError> for ConnectionError {
 }
 
 /// Errors that may occur when fetching entries. Created by methods of
-/// [`Source`](crate::source_sink::Source).
+/// [`Source`](crate::connector::Source).
 #[derive(Debug, Error, Transitive)]
 #[transitive(from(ReqwestError, ConnectionError))]
 pub enum FetchError {
@@ -69,7 +69,7 @@ pub enum FetchError {
 }
 
 /// Errors that may occur when fetching a single entry. Created by
-/// [`Source::fetch_one`](crate::source_sink::Source::fetch_one).
+/// [`Source::fetch_one`](crate::connector::Source::fetch_one).
 #[derive(Debug, Error, Transitive)]
 #[transitive(from(ReqwestError, FetchError))]
 pub enum FetchOneError {
@@ -82,7 +82,7 @@ pub enum FetchOneError {
 }
 
 /// Errors that may occur when sending entries. Created by methods of
-/// [`Sink`](crate::source_sink::Sink).
+/// [`Sink`](crate::connector::Sink).
 #[derive(Debug, Error)]
 pub enum SendError {
     /// Error occured during encoding. This error is likely to implement [`serde::ser::Error`],
@@ -104,7 +104,7 @@ impl From<FmtError> for SendError {
 }
 
 /// Errors that may occur when decoding data from a stream. Created by
-/// [`decode`](crate::rest::Decode::decode).
+/// [`decode`](crate::encode::Decode::decode).
 #[derive(Debug, Error)]
 pub enum DecodeStreamError {
     /// Error occured during decoding.
@@ -125,7 +125,7 @@ impl From<DecodeStreamError> for FetchError {
 }
 
 /// Errors that may occur when decoding a single entry. Created by
-/// [`Decode::decode_one`](crate::rest::Decode::decode_one).
+/// [`Decode::decode_one`](crate::encode::Decode::decode_one).
 #[derive(Debug, Error)]
 pub enum DecodeOneError {
     /// Error occurred during decoding.
