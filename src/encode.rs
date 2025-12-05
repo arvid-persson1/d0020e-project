@@ -129,7 +129,7 @@ pub trait Decode<T> {
     fn decode_all(&self, bytes: &[u8]) -> Result<Vec<T>, DeserializeError>;
 
     /// Decode a single entry from a slice. If the slice is empty or represents an empty
-    /// collection, <code>[Err]\([`Empty`](DecoeOneError::Empty))</code> is returned.
+    /// collection, <code>[Err]\([`Empty`](DecodeOneError::Empty))</code> is returned.
     ///
     /// One entry is assumed to be fairly small such that collection all bytes into a slice is
     /// acceptable, and as such no stream variant of this method exists.
