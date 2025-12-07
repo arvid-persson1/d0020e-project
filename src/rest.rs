@@ -3,7 +3,7 @@
 use crate::{
     connector::{Sink, Source},
     encode::{Decode, Encode},
-    errors::{ConnectionError, FetchError, FetchOneError, SendError, classify_reqwest},
+    errors::{ConnectionError, DecodeError, FetchError, FetchOneError, SendError},
 };
 use futures::{Stream, StreamExt as _};
 use reqwest::{Body, Client, Error as ReqwestError, IntoUrl, Response, Url};
@@ -20,7 +20,7 @@ use std::{io::Error as IoError, marker::PhantomData};
 ///
 /// [`Source`] and [`Sink`] are implemented for `&mut self` to allow for stateful encoders or
 /// decoders, see trait documentation for more information.
-// TODO: Implement variants for readonly/writeonly?
+// TODO: Implement variants for readonly/writeonly connector.
 #[derive(Debug, Clone)]
 pub struct Rest<T, Q, E, D> {
     /// The URL to fetch data from.
@@ -121,7 +121,7 @@ where
             .query(&query)
             .build()
             .map_err(|err| FetchError::InvalidQuery(Box::new(err)))?;
-        self.client.execute(request).await.map_err(classify_reqwest)
+        self.client.execute(request).await.map_err(Into::into)
     }
 
     #[expect(
@@ -146,7 +146,7 @@ where
             .body(body)
             .build()
             .unwrap();
-        self.client.execute(request).await.map_err(classify_reqwest)
+        self.client.execute(request).await.map_err(Into::into)
     }
 }
 
@@ -182,7 +182,9 @@ where
 
     async fn fetch_all(self, query: Self::Query) -> Result<Vec<T>, FetchError> {
         let bytes = self.fetch_impl(query).await?.bytes().await?;
-        self.decoder.decode_all(&bytes).map_err(Into::into)
+        self.decoder
+            .decode_all(&bytes)
+            .map_err(|err| DecodeError(Box::new(err)).into())
     }
 
     async fn fetch_one(self, query: Self::Query) -> Result<T, FetchOneError> {
@@ -203,7 +205,7 @@ where
         T: 's,
         I: IntoIterator<Item = &'s T>,
     {
-        let body = self.encoder.encode(entries)?;
+        let body = self.encoder.encode(entries).map_err(SendError::Encode)?;
         self.send_impl(Vec::from(body))
             .await
             .map(|_| ())
@@ -212,7 +214,10 @@ where
 
     async fn send_all(&self, entries: &[T]) -> Result<(), SendError>
 where {
-        let body = self.encoder.encode_all(entries)?;
+        let body = self
+            .encoder
+            .encode_all(entries)
+            .map_err(SendError::Encode)?;
         self.send_impl(Vec::from(body))
             .await
             .map(|_| ())
@@ -220,10 +225,43 @@ where {
     }
 
     async fn send_one(&self, entry: &T) -> Result<(), SendError> {
-        let body = self.encoder.encode_one(entry)?;
+        let body = self.encoder.encode_one(entry).map_err(SendError::Encode)?;
         self.send_impl(Vec::from(body))
             .await
             .map(|_| ())
             .map_err(Into::into)
+    }
+}
+
+#[cfg(test)]
+#[allow(
+    clippy::missing_panics_doc,
+    reason = "Panics simply indicate failed tests."
+)]
+mod tests {
+    use super::*;
+    use crate::encode::json::Json;
+    use serde::{Deserialize, Serialize};
+
+    #[tokio::test]
+    async fn cat_aas() {
+        #[derive(Clone, Debug, Serialize, Deserialize)]
+        struct Cat {
+            id: String,
+            tags: Vec<String>,
+            created_at: String,
+            url: String,
+            mimetype: String,
+        }
+
+        let mut rest = Rest::new(
+            "https://cataas.com/cat",
+            "https://cataas.com/cat",
+            Json,
+            Json,
+        )
+        .unwrap();
+
+        let _cat: Cat = rest.fetch_one(&[("json", "true")]).await.unwrap();
     }
 }

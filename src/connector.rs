@@ -13,11 +13,13 @@ use std::array::from_ref;
 /// `self`.
 ///
 /// This trait provides several ways of fetching data regarding how much data is returned at a
-/// time. These all have intraconnected default implementations, which means that although no
-/// methods are marked as "required", **an implementation must override at minimum either
+/// time. Some of these have intraconnected default implementations, which means that although some
+/// mathods are not marked as "required", **an implementation must override at minimum either
 /// [`fetch`](Self::fetch) or [`fetch_all`](Self::fetch_all)**, otherwise calls will always fail.
-/// That being said, often more efficient implementations of the other methods are possible. Check
-/// the method documentations for more information.
+/// That being said, often more efficient implementations of both methods are possible. Check the
+/// method documentations for more information.
+// TODO: Add support for writing to existing buffers, i.e. accepting `&mut Vec<T>` or `&mut [T]`
+// and returning `Result<usize, _>`, similar to `std::io::Read`.
 pub trait Source<'a, T>: Sized {
     /// Data to be passed along with a request.
     type Query;
@@ -66,8 +68,6 @@ pub trait Source<'a, T>: Sized {
     ///
     /// This method imposes no restriction on *which* entry should be returned, only that it should
     /// be one matching the query. The query might however uniquely identify one.
-    ///
-    /// The default implementation calls [`fetch_optional`](Self::fetch_optional).
     fn fetch_one(self, query: Self::Query) -> impl Future<Output = Result<T, FetchOneError>>
     where
         Self: 'a,
@@ -146,7 +146,8 @@ pub trait Sink<T> {
     ///
     /// Extra care should be taken when calling this method on a type that does not override the
     /// default implementations, as sending each entry individually may be either very
-    /// computationally expensive or may require a lot of waiting (e.g. on network requests).
+    /// computationally expensive or may require a lot of waiting (e.g. on network requests). Check
+    /// documentation of the concrete implementation for more details.
     ///
     /// [`send_one`]: Self::send_one
     fn send<'s, I>(&self, entries: I) -> impl Future<Output = Result<(), SendError>> + Send

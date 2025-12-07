@@ -1,8 +1,10 @@
 //! Error types used by connectors.
 
+// TODO: Consider reworking error handling entirely using `pattern_types` to reduce nesting and
+// repetition in all of these `enum`s.
+
 use reqwest::Error as ReqwestError;
-use serde::de::value::Error as DeserializeError;
-use std::{error::Error, fmt::Error as FmtError, io::Error as IoError};
+use std::{error::Error, io::Error as IoError};
 use thiserror::Error;
 use transitive::Transitive;
 
@@ -33,22 +35,61 @@ pub enum ConnectionError {
     #[error("Redirect limit was reached or cyclic redirect detected.")]
     Redirect,
     /// A message was received that could not be processed. It might be an issue with encoding,
-    /// charset used, or that an external resource communicated using an unknown format. This
-    /// should not be confused with [`DecodeStreamError::Decode`] or [`DecodeOneError::Decode`],
-    /// which are raised when parsing a message that was successfully received.
+    /// charset used, or that an external resource communicated using an unknown or unexpected
+    /// format.
     #[error(transparent)]
-    Decode(BoxError),
+    Process(BoxError),
 }
 
 impl From<ReqwestError> for ConnectionError {
-    #[expect(clippy::dbg_macro, reason = "Remove after improving error handling.")]
+    /// Classify a [`reqwest::Error`].
+    ///
+    /// `reqwest` provides a single error type which is used by the entire crate. It exposes few
+    /// methods and all of its fields are private. This means that it is generally difficult to
+    /// properly classify it and impossible to extract useful debug information other than possibly
+    /// in its error message. That being said, this function handles some cases and maps them to
+    /// known [`ConnectionError`]s.
+    ///
+    /// # Panics
+    ///
+    /// Panics if for the given error, [`reqwest::Error::is_builder`] is true as those should be
+    /// handled in advance, when returned from the corresponding `build` method. It also panics if
+    /// [`reqwest::Error::is_status`] is true as `reqwest::Response::error_for_status` (and the
+    /// `_ref`) variant should be avoided in favor of passing the error directly to this function
+    /// which identifies the HTTP error and maps it to [`ConnectionError::Http`].
     fn from(value: ReqwestError) -> Self {
-        // TODO: Improve error classification. Can anything useful be extracted from debug
-        // information?
-        dbg!(&value);
-        IoError::other(value).into()
+        // Builder errors should be handled separately.
+        assert!(!value.is_builder());
+        // `Response::error_for_status` (`_ref`) shouldn't be used as HTTP errors are included as
+        // their own variant.
+        assert!(!value.is_status());
+
+        // No guarantee that several of these cases don't match; order by decreasing specificity.
+        if let Some(status) = value.status() {
+            Self::Http {
+                code: status.into(),
+                source: Box::new(value),
+            }
+        } else if value.is_redirect() {
+            Self::Redirect
+        } else if value.is_timeout() {
+            Self::TimedOut
+        } else if value.is_body() || value.is_decode() {
+            Self::Process(Box::new(value))
+        } else {
+            // Reqwest allows errors to have none of these properties.
+            // This case also covers `ReqwestError::is_connect` and `ReqwestError::is_request`.
+            Self::Io(IoError::other(value))
+        }
     }
 }
+
+/// An error that occured during decoding. The inner error is with many implementations likely to
+/// implement [`serde::de::Error`], e.g. [`serde::de::value::Error`], but that trait is not `dyn`
+/// compatible.
+#[derive(Debug, Error)]
+#[error(transparent)]
+pub struct DecodeError(#[from] pub BoxError);
 
 /// Errors that may occur when fetching entries. Created by methods of
 /// [`Source`](crate::connector::Source).
@@ -57,10 +98,10 @@ impl From<ReqwestError> for ConnectionError {
 pub enum FetchError {
     /// Error occured during decoding.
     #[error(transparent)]
-    Decode(#[from] DeserializeError),
+    Decode(#[from] DecodeError),
     /// Error occurred when processing query. The query was not valid or did not match the
     /// requested operation.
-    // TODO: Could this be given more fields or variants?
+    // TODO: More information should be added here.
     #[error("The query was not valid or did not match the requested operation.")]
     InvalidQuery(#[source] BoxError),
     /// Error occured during connection or communication.
@@ -81,14 +122,20 @@ pub enum FetchOneError {
     NoSuchEntry,
 }
 
+/// An error that occured during encoding. The inner error is with many implementations likely to
+/// implement [`serde::ser::Error`], but that trait is not `dyn` compatible.
+#[derive(Debug, Error)]
+#[error(transparent)]
+pub struct EncodeError(#[from] pub BoxError);
+
 /// Errors that may occur when sending entries. Created by methods of
 /// [`Sink`](crate::connector::Sink).
 #[derive(Debug, Error)]
 pub enum SendError {
-    /// Error occured during encoding. This error is likely to implement [`serde::ser::Error`],
-    /// e.g. [`std::fmt::Error`], but that trait is not `dyn` compatible.
-    #[error("{0}")]
-    Encode(#[source] BoxError),
+    /// Error occured during encoding. This error is likely to implement [`serde::ser::Error`], but
+    /// that trait is not `dyn` compatible.
+    #[error(transparent)]
+    Encode(#[from] EncodeError),
     /// The entry/entries were rejected.
     #[error("The entry/entries were rejected.")]
     Rejected,
@@ -97,19 +144,13 @@ pub enum SendError {
     Connection(#[from] ConnectionError),
 }
 
-impl From<FmtError> for SendError {
-    fn from(value: FmtError) -> Self {
-        Self::Encode(Box::new(value))
-    }
-}
-
 /// Errors that may occur when decoding data from a stream. Created by
 /// [`decode`](crate::encode::Decode::decode).
 #[derive(Debug, Error)]
 pub enum DecodeStreamError {
     /// Error occured during decoding.
     #[error(transparent)]
-    Decode(#[from] DeserializeError),
+    Decode(#[from] DecodeError),
     /// A connection was established, but an error occurred before all data was sent.
     #[error(transparent)]
     Connection(#[from] ConnectionError),
@@ -128,9 +169,11 @@ impl From<DecodeStreamError> for FetchError {
 /// [`Decode::decode_one`](crate::encode::Decode::decode_one).
 #[derive(Debug, Error)]
 pub enum DecodeOneError {
-    /// Error occurred during decoding.
+    /// Error occured during decoding. This error is likely to implement [`serde::de::Error`],
+    /// e.g. [`serde::de::value::Error`], but that trait is not `dyn` compatible.
+    // TODO: More information should be added here.
     #[error(transparent)]
-    Decode(#[from] DeserializeError),
+    Decode(#[from] DecodeError),
     /// No bytes were returned or they represent an empty collection.
     #[error("No bytes were returned or they represent an empty collection.")]
     Empty,
@@ -139,53 +182,8 @@ pub enum DecodeOneError {
 impl From<DecodeOneError> for FetchOneError {
     fn from(value: DecodeOneError) -> Self {
         match value {
-            DecodeOneError::Decode(err) => Self::Fetch(err.into()),
+            DecodeOneError::Decode(err) => Self::Fetch(FetchError::Decode(err)),
             DecodeOneError::Empty => Self::NoSuchEntry,
         }
-    }
-}
-
-/// Classify a [`reqwest::Error`].
-///
-/// `reqwest` provides a single error type which is used by the entire crate. It exposes few
-/// methods and all of its fields are private. This means that it is generally difficult to
-/// properly classify it and impossible to extract useful debug information other than possibly in
-/// its error message. That being said, this function handles some cases and maps them to known
-/// [`ConnectionError`]s.
-///
-/// # Panics
-///
-/// Panics if for the given error, [`reqwest::Error::is_builder`] is true as those should be
-/// handled in advance, when returned from the corresponding `build` method. It also panics if
-/// [`reqwest::Error::is_status`] is true as `reqwest::Response::error_for_status` (and the `_ref`)
-/// variant should be avoided in favor of passing the error directly to this function which
-/// identifies the HTTP error and maps it to [`ConnectionError::Http`].
-#[must_use]
-pub fn classify_reqwest<E>(err: ReqwestError) -> E
-where
-    E: From<ConnectionError> + From<ReqwestError>,
-{
-    // Builder errors should be handled separately.
-    assert!(!err.is_builder());
-    // `Response::error_for_status` (`_ref`) shouldn't be used as HTTP errors are included as their
-    // own variant.
-    assert!(!err.is_status());
-
-    if err.is_body() || err.is_decode() {
-        ConnectionError::Decode(Box::new(err)).into()
-    } else if err.is_redirect() {
-        ConnectionError::Redirect.into()
-    } else if err.is_timeout() {
-        ConnectionError::TimedOut.into()
-    } else if let Some(status) = err.status() {
-        ConnectionError::Http {
-            code: status.into(),
-            source: Box::new(err),
-        }
-        .into()
-    } else {
-        // Reqwest allows errors to have none of these properties.
-        // This case also covers `ReqwestError::is_connect` and `ReqwestError::is_request`.
-        err.into()
     }
 }

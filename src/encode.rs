@@ -1,12 +1,12 @@
 //! The `Encode` and `Decode` traits.
 
-use crate::errors::{ConnectionError, DecodeOneError, DecodeStreamError};
+use crate::errors::{ConnectionError, DecodeError, DecodeOneError, DecodeStreamError, EncodeError};
 use bytes::{Bytes, BytesMut};
 use futures::{
     Stream, TryFutureExt as _, TryStreamExt as _, future::ready, stream::iter as from_iter,
 };
-use serde::de::value::Error as DeserializeError;
-use std::{borrow::Borrow, fmt::Error as FmtError};
+
+pub mod json;
 
 /// A type that can encode data as bytes.
 ///
@@ -18,12 +18,7 @@ use std::{borrow::Borrow, fmt::Error as FmtError};
 ///
 /// An encoder is generally stateless, e.g. one for JSON, meaning they will practically often be
 /// ZSTs.
-///
-/// Some of this trait's methods all have intraconnected default implementations, which means that
-/// although no methods are marked as "required", **an implementation must override at minimum
-/// either [`encode`](Self::encode) or [`encode_all`](Self::encode_all)**, otherwise calls will
-/// always fail. That being said, often more efficient implementations of the other methods are
-/// possible. Check the method documentations for more information.
+// TODO: Add support for formatters, allowing things like "pretty printing".
 #[expect(
     clippy::missing_errors_doc,
     reason = "Default implementations only delegate errors and do not raise their own."
@@ -35,39 +30,32 @@ pub trait Encode<T> {
     /// each entry and concatenating the results.
     ///
     /// This method intentionally returns all bytes at once, rather than an iterator, as many
-    /// formats (e.g. JSON) require not only headers but also footers (such as closing a list in
+    /// formats require not only "header data" but also "footer data" (such as closing a list in
     /// JSON). Returning header data and waiting for a footer leaves any intermediate state as
-    /// invalid encoding, and omitting header data means even the final result is invalid. The main
-    /// advantage of this method, then, is if the data can be generated lazily.
+    /// invalid encoding, and omitting header data means even the final result is invalid.
     ///
-    /// The default implementation collects the entries and calls [`encode_all`](Self::encode_all).
-    fn encode<'a, I>(&self, entries: I) -> Result<Box<[u8]>, FmtError>
+    /// The main advantage of this method, then, is if the data can be generated lazily: it may be
+    /// impractical or infeasible to pull all data into memory at once even though the resulting
+    /// encoded data is considerably smaller, or the encoding might be finished before having
+    /// processed all data due to properties of the format.
+    fn encode<'a, I>(&self, entries: I) -> Result<Box<[u8]>, EncodeError>
     where
         T: 'a,
-        I: IntoIterator<Item = &'a T>,
-    {
-        self.encode_all(&entries.into_iter().collect::<Box<_>>())
-    }
+        I: IntoIterator<Item = &'a T>;
 
     /// Encode data from a slice.
     ///
     /// Depending on the format, this may or may not be equivalent to calling
     /// [`encode_one`](Self::encode_one) on each entry and concatenating the results.
-    ///
-    /// The default implementation creates an iterator over the entries and calls
-    /// [`encode`](Self::encode).
-    fn encode_all<B>(&self, entries: &[B]) -> Result<Box<[u8]>, FmtError>
-    where
-        B: Borrow<T>,
-    {
-        self.encode(entries.iter().map(Borrow::borrow))
+    fn encode_all(&self, entries: &[T]) -> Result<Box<[u8]>, EncodeError> {
+        self.encode(entries)
     }
 
     /// Encode a single entry.
     ///
     /// Depending on the format, calling this several times and concatenating the results may or
     /// may not be equivalent to calling `encode_all`.
-    fn encode_one(&self, entry: &T) -> Result<Box<[u8]>, FmtError>;
+    fn encode_one(&self, entry: &T) -> Result<Box<[u8]>, EncodeError>;
 }
 
 /// A type that can decode data from bytes.
@@ -91,8 +79,7 @@ pub trait Decode<T> {
     /// An error may be raised for each item produced, or before any are. Reasonably,
     /// [`DecodeStreamError::Connection`] should only passed on from input; decoding should not
     /// produce new connection errors, though this is not enforced or validated.
-    ///
-    /// The default implementation collects the bytes and calls [`decode_all`](Self::decode_all).
+    // TODO: Can this be simplified using `tokio::io::AsyncRead`?
     fn decode<S>(
         &self,
         bytes: S,
@@ -114,7 +101,7 @@ pub trait Decode<T> {
                 let res = self
                     .decode_all(&buf)
                     .map(|vec| from_iter(vec.into_iter().map(Ok)))
-                    .map_err(Into::into);
+                    .map_err(DecodeStreamError::Decode);
                 ready(res)
             })
     }
@@ -126,17 +113,17 @@ pub trait Decode<T> {
     /// isn't, meaning it would have to make explicit blocking calls, unexpectedly leading to poor
     /// concurrency and possibly performance. It would also require enforcing the contract that
     /// that method must not create new connection errors, since this method cannot return one.
-    fn decode_all(&self, bytes: &[u8]) -> Result<Vec<T>, DeserializeError>;
+    fn decode_all(&self, bytes: &[u8]) -> Result<Vec<T>, DecodeError>;
 
     /// Decode a single entry from a slice. If the slice is empty or represents an empty
     /// collection, <code>[Err]\([`Empty`](DecodeOneError::Empty))</code> is returned.
     ///
     /// One entry is assumed to be fairly small such that collection all bytes into a slice is
     /// acceptable, and as such no stream variant of this method exists.
-    ///
-    /// The default implementation calls [`decode_optional`](Self::decode_optional).
     fn decode_one(&self, bytes: &[u8]) -> Result<T, DecodeOneError> {
-        self.decode_optional(bytes)?.ok_or(DecodeOneError::Empty)
+        self.decode_optional(bytes)
+            .map_err(DecodeOneError::Decode)?
+            .ok_or(DecodeOneError::Empty)
     }
 
     /// Decode a single entry from a slice, if one exists.
@@ -146,5 +133,5 @@ pub trait Decode<T> {
     ///
     /// One entry is assumed to be fairly small such that collection all bytes into a slice is
     /// acceptable, and as such no stream variant of this method exists.
-    fn decode_optional(&self, bytes: &[u8]) -> Result<Option<T>, DeserializeError>;
+    fn decode_optional(&self, bytes: &[u8]) -> Result<Option<T>, DecodeError>;
 }
