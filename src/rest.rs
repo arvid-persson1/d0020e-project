@@ -20,7 +20,9 @@ pub use builder::*;
 /// work to its [`decoder`](Decode).
 ///
 /// [`Source`] is implemented for `&mut self` to allow for stateful decoders, see trait
-/// documentation for more information.
+/// documentation for more information. Note that the type `(&str, &str)` and some similar types
+/// **cannot** be serialized to query parameters, but an array or a slice like `&[(&str, &str)]`
+/// can.
 #[derive(Debug, Clone)]
 pub struct ReadOnly<T, Q, D> {
     /// The URL to fetch data from.
@@ -45,7 +47,7 @@ pub struct ReadOnly<T, Q, D> {
 /// [`Sink`] is implemented for `&mut self` to allow for stateful decoders, see trait
 /// documentation for more information.
 #[derive(Debug, Clone)]
-pub struct WriteOnly<T, Q, E> {
+pub struct WriteOnly<T, E> {
     /// The URL to send data to.
     url: Url,
     /// The HTTP method to use when sending data.
@@ -57,7 +59,7 @@ pub struct WriteOnly<T, Q, E> {
     /// Satisfies missing fields using `T` and `Q`.
     // TODO: This may be overly restrictive when considering variance. Improve using unstable
     // `phantom_variance_markers` (#135806)?
-    _phantom: PhantomData<(T, Q)>,
+    _phantom: PhantomData<T>,
 }
 
 /// A connector to work with REST APIs.
@@ -66,7 +68,9 @@ pub struct WriteOnly<T, Q, E> {
 /// work to its [`encoder`](Encode) and [`decoder`](Decode).
 ///
 /// [`Source`] and [`Sink`] are implemented for `&mut self` to allow for stateful encoders or
-/// decoders, see trait documentation for more information.
+/// decoders, see trait documentation for more information. Note that the type `(&str, &str)` and
+/// some similar types **cannot** be serialized to query parameters, but an array or a slice like
+/// `&[(&str, &str)]` can.
 #[derive(Debug, Clone)]
 pub struct ReadWrite<T, Q, E, D, C> {
     /// The URL to fetch data from.
@@ -250,10 +254,9 @@ where
     }
 }
 
-impl<T, Q, E> Sink<T> for WriteOnly<T, Q, E>
+impl<T, E> Sink<T> for WriteOnly<T, E>
 where
     T: Sync,
-    Q: Sync,
     E: Encode<T> + Sync,
 {
     async fn send<'s, I>(&self, entries: I) -> Result<(), SendError>
@@ -384,6 +387,6 @@ mod tests {
             .decoder(Json)
             .build();
 
-        let _cat: Cat = rest.fetch_one(&[("json", "true")]).await.unwrap();
+        let _cat: Cat = rest.fetch_one([("json", "true")]).await.unwrap();
     }
 }

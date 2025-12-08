@@ -629,7 +629,7 @@ impl<T, Q, D, const SOURCE_METHOD: bool, const CLIENT: bool> Build
 impl<T, Q, E, const SINK_METHOD: bool, const CLIENT: bool> Build
     for Builder<T, Q, E, !, !, false, false, true, SINK_METHOD, CLIENT, true, false, false>
 {
-    type Output = WriteOnly<T, Q, E>;
+    type Output = WriteOnly<T, E>;
 
     fn build(self) -> Self::Output {
         let Self {
