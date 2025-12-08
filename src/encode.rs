@@ -3,8 +3,11 @@
 use crate::errors::{ConnectionError, DecodeError, DecodeOneError, DecodeStreamError, EncodeError};
 use bytes::{Bytes, BytesMut};
 use futures::{
-    Stream, TryFutureExt as _, TryStreamExt as _, future::ready, stream::iter as from_iter,
+    Stream, TryFutureExt as _, TryStreamExt as _,
+    future::{Either, ready},
+    stream::iter as from_iter,
 };
+use std::marker::PhantomData;
 
 pub mod json;
 
@@ -134,4 +137,113 @@ pub trait Decode<T> {
     /// One entry is assumed to be fairly small such that collection all bytes into a slice is
     /// acceptable, and as such no stream variant of this method exists.
     fn decode_optional(&self, bytes: &[u8]) -> Result<Option<T>, DecodeError>;
+}
+
+/// A type used for encoding and decoding, with the option to use the same value for both.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct Codec<T, E = (), D = (), C = ()>(CodecImpl<T, E, D, C>);
+
+/// Implementation of [`Codec`].
+// TODO: `PhantomData` usage here may be overly restrictive when considering variance. Improve
+// using unstable `phantom_variance_markers` (#135806)?
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+enum CodecImpl<T, E, D, C> {
+    /// Separate encoder and decoder.
+    Separate(E, D, PhantomData<T>),
+    /// One value serving as both encoder and decoder.
+    Combined(C, PhantomData<T>),
+}
+
+impl<T, E, D, C> Codec<T, E, D, C> {
+    /// Construct a [`Codec`] using a separate encoder and decoder.
+    pub const fn separate(encoder: E, decoder: D) -> Self {
+        Self(CodecImpl::Separate(encoder, decoder, PhantomData))
+    }
+
+    /// Construct a [`Codec`] using one value as both encoder and decoder.
+    pub const fn combined(combined: C) -> Self {
+        Self(CodecImpl::Combined(combined, PhantomData))
+    }
+}
+
+impl<T, E, D, C> From<C> for Codec<T, E, D, C>
+where
+    C: Encode<T> + Decode<T>,
+{
+    fn from(value: C) -> Self {
+        Self::combined(value)
+    }
+}
+
+impl<T, E, D, C> Encode<T> for Codec<T, E, D, C>
+where
+    E: Encode<T>,
+    C: Encode<T>,
+{
+    fn encode<'a, I>(&self, entries: I) -> Result<Box<[u8]>, EncodeError>
+    where
+        T: 'a,
+        I: IntoIterator<Item = &'a T>,
+    {
+        match &self.0 {
+            CodecImpl::Separate(encoder, ..) => encoder.encode(entries),
+            CodecImpl::Combined(combined, ..) => combined.encode(entries),
+        }
+    }
+
+    fn encode_all(&self, entries: &[T]) -> Result<Box<[u8]>, EncodeError> {
+        match &self.0 {
+            CodecImpl::Separate(encoder, ..) => encoder.encode_all(entries),
+            CodecImpl::Combined(combined, ..) => combined.encode_all(entries),
+        }
+    }
+
+    fn encode_one(&self, entry: &T) -> Result<Box<[u8]>, EncodeError> {
+        match &self.0 {
+            CodecImpl::Separate(encoder, ..) => encoder.encode_one(entry),
+            CodecImpl::Combined(combined, ..) => combined.encode_one(entry),
+        }
+    }
+}
+
+impl<T, E, D, C> Decode<T> for Codec<T, E, D, C>
+where
+    D: Decode<T> + Sync,
+    C: Decode<T> + Sync,
+{
+    async fn decode<S>(
+        &self,
+        bytes: S,
+    ) -> Result<impl Stream<Item = Result<T, DecodeStreamError>> + Send + Unpin, DecodeStreamError>
+    where
+        Self: Sync,
+        T: Send,
+        S: Stream<Item = Result<Bytes, ConnectionError>> + Send,
+    {
+        match &self.0 {
+            CodecImpl::Separate(_, decoder, ..) => decoder.decode(bytes).await.map(Either::Left),
+            CodecImpl::Combined(combined, ..) => combined.decode(bytes).await.map(Either::Right),
+        }
+    }
+
+    fn decode_all(&self, bytes: &[u8]) -> Result<Vec<T>, DecodeError> {
+        match &self.0 {
+            CodecImpl::Separate(_, decoder, ..) => decoder.decode_all(bytes),
+            CodecImpl::Combined(combined, ..) => combined.decode_all(bytes),
+        }
+    }
+
+    fn decode_one(&self, bytes: &[u8]) -> Result<T, DecodeOneError> {
+        match &self.0 {
+            CodecImpl::Separate(_, decoder, ..) => decoder.decode_one(bytes),
+            CodecImpl::Combined(combined, ..) => combined.decode_one(bytes),
+        }
+    }
+
+    fn decode_optional(&self, bytes: &[u8]) -> Result<Option<T>, DecodeError> {
+        match &self.0 {
+            CodecImpl::Separate(_, decoder, ..) => decoder.decode_optional(bytes),
+            CodecImpl::Combined(combined, ..) => combined.decode_optional(bytes),
+        }
+    }
 }

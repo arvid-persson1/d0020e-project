@@ -1,3 +1,6 @@
+#![feature(never_type)]
+#![feature(type_changing_struct_update)]
+
 //! The data broker.
 
 // TODO: Rework module visibility, nesting, public exports.
