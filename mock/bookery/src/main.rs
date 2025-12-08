@@ -1,7 +1,7 @@
-use actix_web::{web, App, HttpResponse, HttpServer, Responder};
+use actix_web::{App, HttpResponse, HttpServer, Responder, web};
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
 use std::sync::Mutex;
+use uuid::Uuid;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 enum BookFormatType {
@@ -35,7 +35,6 @@ struct CreateBook {
 struct AppState {
     books: Mutex<Vec<Book>>,
 }
-
 
 async fn get_books(data: web::Data<AppState>) -> impl Responder {
     let books = (*data).books.lock().unwrap();
@@ -74,16 +73,14 @@ async fn main() -> std::io::Result<()> {
     println!("Bookstore API running at http://localhost:8080");
 
     HttpServer::new(move || {
-        App::new()
-            .app_data(app_state.clone())
-            .service(
-                web::scope("/books")
-                    .route("", web::get().to(get_books))
-                    .route("", web::post().to(create_book))
-                    .route("/{id}", web::get().to(get_book)),
-            )
+        App::new().app_data(app_state.clone()).service(
+            web::scope("/books")
+                .route("", web::get().to(get_books))
+                .route("", web::post().to(create_book))
+                .route("/{id}", web::get().to(get_book)),
+        )
     })
-        .bind(("127.0.0.1", 8080))?
-        .run()
-        .await
+    .bind(("127.0.0.1", 8080))?
+    .run()
+    .await
 }
