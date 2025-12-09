@@ -63,7 +63,8 @@ See [The Cargo Book](https://doc.rust-lang.org/cargo/) for more commands.
 The main branch is protected and direct pushes are disallowed. Any attempt to write to the main branch must be accompanied by a pull request to be approved by at least one other person. A linear history is to be maintained on the main branch, through either rebases or squashes when merging.
 
 The project uses a strict CI run on each push. Any pull request failing CI checks will be denied. These checks include:
-- Verifying that the code is formatted (as specified by `rustfmt`, configured in `rustfmt.toml).
+- Verifying that the code is formatted (as specified by `rustfmt`, configured in `rustfmt.toml`).
 - Linting (using both `rustc` and `cargo clippy`, configured in `Cargo.toml`), treating all warnings as errors. Lints include, but are not limited to, code style, naming conventions, presence of documentation and detection of suspicious patterns.
 - Enforcing documentation (using `cargo doc`), including detection of broken links, missing "Errors" or "Panics" sections where applicable, and verifying that code snippets compile.
+
 - Testing (using `cargo test`). Current tests include unit tests; automatic integration tests may be considered in the future.
