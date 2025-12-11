@@ -23,6 +23,10 @@ use thiserror::Error;
 /// documentations can be quite messy with the type signatures. It is advised to consult the guide
 /// above instead.
 // TODO: Add support for more fields of `reqwest::RequestBuilder`, e.g. HTTP headers.
+// TODO: This feels like a realization of a more general pattern that would be useful to create a
+// macro to generate.
+// TODO: Can be optimized by replacing usage of `Option` with `MaybeUninit` since constant
+// parameters already tell which fields are "initialized".
 #[derive(Clone, Debug)]
 pub struct Builder<
     T,
@@ -40,35 +44,35 @@ pub struct Builder<
     const COMBINED: bool = false,
 > {
     /// The [URL](IntoUrl) to use when fetching data.
-    // Invariant: `source_url.is_some() == SOURCE_URL`.
-    // Invariant: `source_url.map_or(true, |url| url.into_url().is_ok())`. This is validated during
+    // INVARIANT: `source_url.is_some() == SOURCE_URL`.
+    // INVARIANT: `source_url.map_or(true, |url| url.into_url().is_ok())`. This is validated during
     // construction.
     source_url: Option<Url>,
     /// The [HTTP method](Method) to use when fetching data. Defaults to [`GET`](Method::GET).
-    // Invariant: `source_method.is_some() == SOURCE_METHOD`.
+    // INVARIANT: `source_method.is_some() == SOURCE_METHOD`.
     source_method: Option<Method>,
     /// The [URL](IntoUrl) to use when sending data.
-    // Invariant: `sink_url.is_some() == SINK_URL`.
-    // Invariant: `sink_url.map_or(true, |url| url.into_url().is_ok())`. This is validated during
+    // INVARIANT: `sink_url.is_some() == SINK_URL`.
+    // INVARIANT: `sink_url.map_or(true, |url| url.into_url().is_ok())`. This is validated during
     // construction.
     sink_url: Option<Url>,
     /// The [HTTP method](Method) to use when sending data. Defaults to [`PUT`](Method::PUT).
-    // Invariant: `sink_method.is_some() == SINK_METHOD`.
+    // INVARIANT: `sink_method.is_some() == SINK_METHOD`.
     sink_method: Option<Method>,
     /// The [`Client`] to use when making requests.
-    // Invariant: `client.is_some() == CLIENT`.
+    // INVARIANT: `client.is_some() == CLIENT`.
     client: Option<Client>,
     /// The [encoder](Encode) to use when sending data.
-    // Invariant: `encoder.is_some() == ENCODER`.
+    // INVARIANT: `encoder.is_some() == ENCODER`.
     encoder: Option<E>,
     /// The [decoder](Decode) to use when fetching data.
-    // Invariant: `decoder.is_some() == DECODER`.
+    // INVARIANT: `decoder.is_some() == DECODER`.
     decoder: Option<D>,
     /// The combined [encoder](Encode) and [decoder](Decode) to use when sending and fetching data
     /// respestively.
-    // Invariant: `combined.is_some() == COMBINED`.
-    // Invariant: `!(combined.is_some() && encoder.is_some())`.
-    // Invariant: `!(combined.is_some() && decoder.is_some())`.
+    // INVARIANT: `combined.is_some() == COMBINED`.
+    // INVARIANT: `!(combined.is_some() && encoder.is_some())`.
+    // INVARIANT: `!(combined.is_some() && decoder.is_some())`.
     combined: Option<C>,
     /// Satisfies missing fields using `T` and `Q`.
     // TODO: This may be overly restrictive when considering variance. Improve using unstable
@@ -125,7 +129,7 @@ impl<
         E,
         D,
         C,
-        false,
+        false, // SOURCE_URL
         SOURCE_METHOD,
         SINK_URL,
         SINK_METHOD,
@@ -155,7 +159,7 @@ impl<
             E,
             D,
             C,
-            true,
+            true, // SOURCE_URL
             SOURCE_METHOD,
             SINK_URL,
             SINK_METHOD,
@@ -194,7 +198,7 @@ impl<
         D,
         C,
         SOURCE_URL,
-        false,
+        false, // SOURCE_METHOD
         SINK_URL,
         SINK_METHOD,
         CLIENT,
@@ -214,7 +218,7 @@ impl<
         D,
         C,
         SOURCE_URL,
-        true,
+        true, // SOURCE_METHOD
         SINK_URL,
         SINK_METHOD,
         CLIENT,
@@ -251,7 +255,7 @@ impl<
         C,
         SOURCE_URL,
         SOURCE_METHOD,
-        false,
+        false, // SINK_URL
         SINK_METHOD,
         CLIENT,
         ENCODER,
@@ -281,7 +285,7 @@ impl<
             C,
             SOURCE_URL,
             SOURCE_METHOD,
-            true,
+            true, // SINK_URL
             SINK_METHOD,
             CLIENT,
             ENCODER,
@@ -320,7 +324,7 @@ impl<
         SOURCE_URL,
         SOURCE_METHOD,
         SINK_URL,
-        false,
+        false, // SINK_METHOD
         CLIENT,
         ENCODER,
         DECODER,
@@ -340,7 +344,7 @@ impl<
         SOURCE_URL,
         SOURCE_METHOD,
         SINK_URL,
-        true,
+        true, // SINK_METHOD
         CLIENT,
         ENCODER,
         DECODER,
@@ -377,7 +381,7 @@ impl<
         SOURCE_METHOD,
         SINK_URL,
         SINK_METHOD,
-        false,
+        false, // CLIENT
         ENCODER,
         DECODER,
         COMBINED,
@@ -397,7 +401,7 @@ impl<
         SOURCE_METHOD,
         SINK_URL,
         SINK_METHOD,
-        true,
+        true, // CLIENT
         ENCODER,
         DECODER,
         COMBINED,
@@ -432,9 +436,9 @@ impl<
         SINK_URL,
         SINK_METHOD,
         CLIENT,
-        false,
+        false, // ENCODER
         DECODER,
-        false,
+        false, // COMBINED
     >
 {
     /// Add an [encoder](crate::encode::Encode) to the connector. One is needed to construct a
@@ -457,9 +461,9 @@ impl<
         SINK_URL,
         SINK_METHOD,
         CLIENT,
-        true,
+        true, // ENCODER
         DECODER,
-        false,
+        false, // COMBINED
     > {
         assert!(self.combined.is_none());
         Builder {
@@ -493,8 +497,8 @@ impl<
         SINK_METHOD,
         CLIENT,
         ENCODER,
-        false,
-        false,
+        false, // DECODER
+        false, // COMBINED
     >
 {
     /// Add an [decoder](crate::encode::Decode) to the connector. One is needed to construct a
@@ -518,8 +522,8 @@ impl<
         SINK_METHOD,
         CLIENT,
         ENCODER,
-        true,
-        false,
+        true,  // DECODER
+        false, // COMBINED
     > {
         assert!(self.combined.is_none());
         Builder {
@@ -549,9 +553,9 @@ impl<
         SINK_URL,
         SINK_METHOD,
         CLIENT,
-        false,
-        false,
-        false,
+        false, // ENCODER
+        false, // DECODER
+        false, // COMBINED
     >
 {
     /// Add a [`Codec`] to the connector. One is needed to construct a [`ReadWrite`], and is
@@ -574,9 +578,9 @@ impl<
         SINK_URL,
         SINK_METHOD,
         CLIENT,
-        false,
-        false,
-        true,
+        false, // ENCODER
+        false, // DECODER
+        true,  // COMBINED
     > {
         assert!(self.encoder.is_none());
         assert!(self.decoder.is_none());
@@ -599,6 +603,7 @@ pub trait Build {
     fn build(self) -> Self::Output;
 }
 
+// `source_url` and `decoder` set: `ReadOnly`.
 impl<T, Q, D, const SOURCE_METHOD: bool, const CLIENT: bool> Build
     for Builder<T, Q, !, D, !, true, SOURCE_METHOD, false, false, CLIENT, false, true, false>
 {
@@ -626,6 +631,7 @@ impl<T, Q, D, const SOURCE_METHOD: bool, const CLIENT: bool> Build
     }
 }
 
+// `sink_url` and `encoder` set: `WriteOnly`.
 impl<T, Q, E, const SINK_METHOD: bool, const CLIENT: bool> Build
     for Builder<T, Q, E, !, !, false, false, true, SINK_METHOD, CLIENT, true, false, false>
 {
@@ -653,6 +659,7 @@ impl<T, Q, E, const SINK_METHOD: bool, const CLIENT: bool> Build
     }
 }
 
+// `source_url`, `sink_url`, `encoder` and `decoder` set: `ReadWrite`.
 impl<T, Q, E, D, const SOURCE_METHOD: bool, const SINK_METHOD: bool, const CLIENT: bool> Build
     for Builder<T, Q, E, D, !, true, SOURCE_METHOD, true, SINK_METHOD, CLIENT, true, true, false>
 {
@@ -686,6 +693,7 @@ impl<T, Q, E, D, const SOURCE_METHOD: bool, const SINK_METHOD: bool, const CLIEN
     }
 }
 
+// `source_url`, `sink_url`, and `combined` set: `ReadWrite`.
 impl<T, Q, C, const SOURCE_METHOD: bool, const SINK_METHOD: bool, const CLIENT: bool> Build
     for Builder<T, Q, !, !, C, true, SOURCE_METHOD, true, SINK_METHOD, CLIENT, false, false, true>
 {
