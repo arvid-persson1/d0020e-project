@@ -33,6 +33,7 @@ where
     // `encode_one`.
     // PERF: This implementation allocates more than theoretically necessary. This could be avoided
     // if there was support for encoding into an existing buffer.
+    #[inline]
     fn encode<'a, I>(&self, entries: I) -> Result<Box<[u8]>, EncodeError>
     where
         T: 'a,
@@ -66,10 +67,12 @@ where
         Ok(buf.into())
     }
 
+    #[inline]
     fn encode_all(&self, entries: &[T]) -> Result<Box<[u8]>, EncodeError> {
         Self::format(entries)
     }
 
+    #[inline]
     fn encode_one(&self, entry: &T) -> Result<Box<[u8]>, EncodeError> {
         Self::format(entry)
     }
@@ -83,6 +86,7 @@ where
     // implementing some functionality beyond what is provided by `serde_json`, or possibly just
     // managing a custom `Deserializer`.
 
+    #[inline]
     fn decode_all(&self, bytes: &[u8]) -> Result<Vec<T>, DecodeError> {
         from_slice(bytes).map_err(|_err| todo!())
     }
@@ -94,6 +98,7 @@ where
     ///
     /// One entry is assumed to be fairly small such that collection all bytes into a slice is
     /// acceptable, and as such no stream variant of this method exists.
+    #[inline]
     fn decode_optional(&self, bytes: &[u8]) -> Result<Option<T>, DecodeError> {
         if bytes.is_empty() {
             Ok(None)
