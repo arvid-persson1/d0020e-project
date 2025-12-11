@@ -53,8 +53,14 @@ incremental = false
 panic = "abort"
 
 [dependencies]
+bytes = "1.11.0"
 futures = "0.3.31"
+reqwest = { features = ["stream"], version = "0.12.24" }
+serde = { features = ["derive"], version = "1.0.228" }
+serde_json = "1.0.145"
 thiserror = "2.0.17"
+tokio = { features = ["macros"], version = "1.48.0" }
+transitive = "1.2.0"
 
 [workspace.lints.rust]
 # Core language features and proper use of common APIs.
