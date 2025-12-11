@@ -1,0 +1,28 @@
+type Book {
+    title: String!
+    author: String
+    format: String
+    isbn: Integer
+}
+
+type Query {
+    getAllBooks: [Book]
+    getBook(title: String!)
+}
+
+# These three probably won't be needed. As far as I've gathered, only the query's are needed for a mock API
+type Mutation {
+    createBook(input: CreateBookInput): Book
+    removeBook(input: RemoveBookInput): Book
+}
+ 
+input CreateBookInput {
+    title: String!
+    author: String
+    format: String
+    isbn: Integer
+} 
+
+input RemoveBookInput {
+    title: String!
+}

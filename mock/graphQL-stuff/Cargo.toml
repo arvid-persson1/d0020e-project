@@ -1,0 +1,19 @@
+[package]
+name = "graphQL-stuff"
+categories.workspace = true
+description.workspace = true
+edition.workspace = true
+keywords.workspace = true
+license.workspace = true
+readme.workspace = true
+repository.workspace = true
+version.workspace = true
+
+[dependencies]
+async-graphql = "7.0"
+async-graphql-axum = "7.0"
+axum = "0.8"
+tokio = {version = "1.4", features = ["full"]}
+
+[lints]
+workspace = true
