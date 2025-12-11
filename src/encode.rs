@@ -50,6 +50,7 @@ pub trait Encode<T> {
     ///
     /// Depending on the format, this may or may not be equivalent to calling
     /// [`encode_one`](Self::encode_one) on each entry and concatenating the results.
+    #[inline]
     fn encode_all(&self, entries: &[T]) -> Result<Box<[u8]>, EncodeError> {
         self.encode(entries)
     }
@@ -83,6 +84,7 @@ pub trait Decode<T> {
     /// [`DecodeStreamError::Connection`] should only passed on from input; decoding should not
     /// produce new connection errors, though this is not enforced or validated.
     // TODO: Can this be simplified using `tokio::io::AsyncRead`?
+    #[inline]
     fn decode<S>(
         &self,
         bytes: S,
@@ -123,6 +125,7 @@ pub trait Decode<T> {
     ///
     /// One entry is assumed to be fairly small such that collection all bytes into a slice is
     /// acceptable, and as such no stream variant of this method exists.
+    #[inline]
     fn decode_one(&self, bytes: &[u8]) -> Result<T, DecodeOneError> {
         self.decode_optional(bytes)
             .map_err(DecodeOneError::Decode)?
@@ -156,11 +159,13 @@ enum CodecImpl<T, E, D, C> {
 
 impl<T, E, D, C> Codec<T, E, D, C> {
     /// Construct a [`Codec`] using a separate encoder and decoder.
+    #[inline]
     pub const fn separate(encoder: E, decoder: D) -> Self {
         Self(CodecImpl::Separate(encoder, decoder, PhantomData))
     }
 
     /// Construct a [`Codec`] using one value as both encoder and decoder.
+    #[inline]
     pub const fn combined(combined: C) -> Self {
         Self(CodecImpl::Combined(combined, PhantomData))
     }
@@ -170,6 +175,7 @@ impl<T, E, D, C> From<C> for Codec<T, E, D, C>
 where
     C: Encode<T> + Decode<T>,
 {
+    #[inline]
     fn from(value: C) -> Self {
         Self::combined(value)
     }
@@ -180,6 +186,7 @@ where
     E: Encode<T>,
     C: Encode<T>,
 {
+    #[inline]
     fn encode<'a, I>(&self, entries: I) -> Result<Box<[u8]>, EncodeError>
     where
         T: 'a,
@@ -191,6 +198,7 @@ where
         }
     }
 
+    #[inline]
     fn encode_all(&self, entries: &[T]) -> Result<Box<[u8]>, EncodeError> {
         match &self.0 {
             CodecImpl::Separate(encoder, ..) => encoder.encode_all(entries),
@@ -198,6 +206,7 @@ where
         }
     }
 
+    #[inline]
     fn encode_one(&self, entry: &T) -> Result<Box<[u8]>, EncodeError> {
         match &self.0 {
             CodecImpl::Separate(encoder, ..) => encoder.encode_one(entry),
@@ -211,6 +220,7 @@ where
     D: Decode<T> + Sync,
     C: Decode<T> + Sync,
 {
+    #[inline]
     async fn decode<S>(
         &self,
         bytes: S,
@@ -226,6 +236,7 @@ where
         }
     }
 
+    #[inline]
     fn decode_all(&self, bytes: &[u8]) -> Result<Vec<T>, DecodeError> {
         match &self.0 {
             CodecImpl::Separate(_, decoder, ..) => decoder.decode_all(bytes),
@@ -233,6 +244,7 @@ where
         }
     }
 
+    #[inline]
     fn decode_one(&self, bytes: &[u8]) -> Result<T, DecodeOneError> {
         match &self.0 {
             CodecImpl::Separate(_, decoder, ..) => decoder.decode_one(bytes),
@@ -240,6 +252,7 @@ where
         }
     }
 
+    #[inline]
     fn decode_optional(&self, bytes: &[u8]) -> Result<Option<T>, DecodeError> {
         match &self.0 {
             CodecImpl::Separate(_, decoder, ..) => decoder.decode_optional(bytes),

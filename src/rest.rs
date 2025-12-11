@@ -149,6 +149,7 @@ where
 {
     type Query = Q;
 
+    #[inline]
     async fn fetch(
         self,
         query: Self::Query,
@@ -170,6 +171,7 @@ where
             .map_err(Into::into)
     }
 
+    #[inline]
     async fn fetch_all(self, query: Self::Query) -> Result<Vec<T>, FetchError> {
         let bytes = fetch_impl(&self.client, self.url.clone(), self.method.clone(), query)
             .await?
@@ -180,6 +182,7 @@ where
             .map_err(|err| DecodeError(Box::new(err)).into())
     }
 
+    #[inline]
     async fn fetch_one(self, query: Self::Query) -> Result<T, FetchOneError> {
         let bytes = fetch_impl(&self.client, self.url.clone(), self.method.clone(), query)
             .await?
@@ -199,6 +202,7 @@ where
 {
     type Query = Q;
 
+    #[inline]
     async fn fetch(
         self,
         query: Self::Query,
@@ -225,6 +229,7 @@ where
             .map_err(Into::into)
     }
 
+    #[inline]
     async fn fetch_all(self, query: Self::Query) -> Result<Vec<T>, FetchError> {
         let bytes = fetch_impl(
             &self.client,
@@ -240,6 +245,7 @@ where
             .map_err(|err| DecodeError(Box::new(err)).into())
     }
 
+    #[inline]
     async fn fetch_one(self, query: Self::Query) -> Result<T, FetchOneError> {
         let bytes = fetch_impl(
             &self.client,
@@ -259,6 +265,7 @@ where
     T: Sync,
     E: Encode<T> + Sync,
 {
+    #[inline]
     async fn send<'s, I>(&self, entries: I) -> Result<(), SendError>
     where
         T: 's,
@@ -276,6 +283,7 @@ where
         .map_err(Into::into)
     }
 
+    #[inline]
     async fn send_all(&self, entries: &[T]) -> Result<(), SendError> {
         let body = self
             .encoder
@@ -292,6 +300,7 @@ where
         .map_err(Into::into)
     }
 
+    #[inline]
     async fn send_one(&self, entry: &T) -> Result<(), SendError> {
         let body = self.encoder.encode_one(entry).map_err(SendError::Encode)?;
         send_impl(
@@ -314,6 +323,7 @@ where
     D: Sync,
     C: Encode<T> + Sync,
 {
+    #[inline]
     async fn send<'s, I>(&self, entries: I) -> Result<(), SendError>
     where
         T: 's,
@@ -331,6 +341,7 @@ where
         .map_err(Into::into)
     }
 
+    #[inline]
     async fn send_all(&self, entries: &[T]) -> Result<(), SendError> {
         let body = self.codec.encode_all(entries).map_err(SendError::Encode)?;
         send_impl(
@@ -344,6 +355,7 @@ where
         .map_err(Into::into)
     }
 
+    #[inline]
     async fn send_one(&self, entry: &T) -> Result<(), SendError> {
         let body = self.codec.encode_one(entry).map_err(SendError::Encode)?;
         send_impl(

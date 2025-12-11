@@ -34,6 +34,7 @@ pub trait Source<'a, T>: Sized {
     // `Unpin` is needed to support this default implementation of `fetch_optional`. This bound is
     // likely to be less restrictive than the alternative, see comment below.
     // TODO: Is a default implementation that imposes neither restriction possible?
+    #[inline]
     fn fetch(
         self,
         query: Self::Query,
@@ -53,6 +54,7 @@ pub trait Source<'a, T>: Sized {
     /// implementors **must** override this function unless they instead override [`fetch`].
     ///
     /// [`fetch`]: Self::fetch
+    #[inline]
     fn fetch_all(
         self,
         query: Self::Query,
@@ -68,6 +70,7 @@ pub trait Source<'a, T>: Sized {
     ///
     /// This method imposes no restriction on *which* entry should be returned, only that it should
     /// be one matching the query. The query might however uniquely identify one.
+    #[inline]
     fn fetch_one(self, query: Self::Query) -> impl Future<Output = Result<T, FetchOneError>>
     where
         Self: 'a,
@@ -83,6 +86,7 @@ pub trait Source<'a, T>: Sized {
     /// be one matching the query. The query might however uniquely identify one.
     ///
     /// The default implementation calls [`fetch`](Self::fetch) and returns the first item.
+    #[inline]
     fn fetch_optional<'s>(
         self,
         query: Self::Query,
@@ -124,6 +128,7 @@ pub trait Source<'a, T>: Sized {
         unused_variables,
         reason = "Avoids raising `clippy::renamed_function_params` in implementors."
     )]
+    #[inline]
     fn size_hint(&self, query: &Self::Query) -> (usize, Option<usize>) {
         (0, None)
     }
@@ -150,6 +155,7 @@ pub trait Sink<T> {
     /// documentation of the concrete implementation for more details.
     ///
     /// [`send_one`]: Self::send_one
+    #[inline]
     fn send<'s, I>(&self, entries: I) -> impl Future<Output = Result<(), SendError>> + Send
     where
         Self: Sync,
@@ -173,6 +179,7 @@ pub trait Sink<T> {
     /// [`send`] or its dependencies.
     ///
     /// [`send`]: Self::send
+    #[inline]
     fn send_all(&self, entries: &[T]) -> impl Future<Output = Result<(), SendError>> + Send
     where
         Self: Sync,
@@ -188,6 +195,7 @@ pub trait Sink<T> {
     /// [`send_all`] or its dependencies.
     ///
     /// [`send_all`]: Self::send_all
+    #[inline]
     fn send_one(&self, entry: &T) -> impl Future<Output = Result<(), SendError>> + Send
     where
         Self: Sync,

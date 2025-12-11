@@ -57,6 +57,7 @@ impl From<ReqwestError> for ConnectionError {
     /// [`reqwest::Error::is_status`] is true as `reqwest::Response::error_for_status` (and the
     /// `_ref`) variant should be avoided in favor of passing the error directly to this function
     /// which identifies the HTTP error and maps it to [`ConnectionError::Http`].
+    #[inline]
     fn from(value: ReqwestError) -> Self {
         // Builder errors should be handled separately.
         assert!(!value.is_builder());
@@ -157,6 +158,7 @@ pub enum DecodeStreamError {
 }
 
 impl From<DecodeStreamError> for FetchError {
+    #[inline]
     fn from(value: DecodeStreamError) -> Self {
         match value {
             DecodeStreamError::Decode(err) => Self::Decode(err),
@@ -180,6 +182,7 @@ pub enum DecodeOneError {
 }
 
 impl From<DecodeOneError> for FetchOneError {
+    #[inline]
     fn from(value: DecodeOneError) -> Self {
         match value {
             DecodeOneError::Decode(err) => Self::Fetch(FetchError::Decode(err)),

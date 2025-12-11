@@ -83,6 +83,7 @@ pub struct Builder<
 impl<T, Q> Builder<T, Q> {
     /// Construct a [`Builder`] with no fields set.
     #[must_use]
+    #[inline]
     pub const fn new() -> Self {
         Self {
             source_url: None,
@@ -99,6 +100,7 @@ impl<T, Q> Builder<T, Q> {
 }
 
 impl<T, Q> Default for Builder<T, Q> {
+    #[inline]
     fn default() -> Self {
         Self::new()
     }
@@ -149,6 +151,7 @@ impl<
         clippy::map_err_ignore,
         reason = "`reqwest::Error` exposes no useful information about the error."
     )]
+    #[inline]
     pub fn source_url<U: IntoUrl>(
         self,
         url: U,
@@ -208,6 +211,7 @@ impl<
     >
 {
     /// Specifies the HTTP method to use when fetching data. Defaults to [`GET`](Method::GET).
+    #[inline]
     pub fn source_method(
         self,
         method: Method,
@@ -273,6 +277,7 @@ impl<
         clippy::map_err_ignore,
         reason = "`reqwest::Error` exposes no useful information about the error."
     )]
+    #[inline]
     pub fn sink_url<U: IntoUrl>(
         self,
         url: U,
@@ -332,6 +337,7 @@ impl<
     >
 {
     /// Specifies the HTTP method to use when sending data. Defaults to [`PUT`](Method::PUT).
+    #[inline]
     pub fn sink_method(
         self,
         method: Method,
@@ -388,6 +394,7 @@ impl<
     >
 {
     /// Add a [`Client`] to the connector. If none is specified, a default is used.
+    #[inline]
     pub fn client(
         self,
         client: Client,
@@ -447,6 +454,7 @@ impl<
         clippy::missing_panics_doc,
         reason = "Assertions will not fail if invariants are upheld."
     )]
+    #[inline]
     pub fn encoder<E>(
         self,
         encoder: E,
@@ -507,6 +515,7 @@ impl<
         clippy::missing_panics_doc,
         reason = "Assertions will not fail if invariants are upheld."
     )]
+    #[inline]
     pub fn decoder<D>(
         self,
         decoder: D,
@@ -564,6 +573,7 @@ impl<
         clippy::missing_panics_doc,
         reason = "Assertions will not fail if invariants are upheld."
     )]
+    #[inline]
     pub fn codec<C>(
         self,
         codec: C,
@@ -609,6 +619,7 @@ impl<T, Q, D, const SOURCE_METHOD: bool, const CLIENT: bool> Build
 {
     type Output = ReadOnly<T, Q, D>;
 
+    #[inline]
     fn build(self) -> Self::Output {
         let Self {
             source_url: Some(url),
@@ -637,6 +648,7 @@ impl<T, Q, E, const SINK_METHOD: bool, const CLIENT: bool> Build
 {
     type Output = WriteOnly<T, E>;
 
+    #[inline]
     fn build(self) -> Self::Output {
         let Self {
             sink_url: Some(url),
@@ -665,6 +677,7 @@ impl<T, Q, E, D, const SOURCE_METHOD: bool, const SINK_METHOD: bool, const CLIEN
 {
     type Output = ReadWrite<T, Q, E, D, !>;
 
+    #[inline]
     fn build(self) -> Self::Output {
         let Self {
             source_url: Some(source_url),
@@ -699,6 +712,7 @@ impl<T, Q, C, const SOURCE_METHOD: bool, const SINK_METHOD: bool, const CLIENT: 
 {
     type Output = ReadWrite<T, Q, !, !, C>;
 
+    #[inline]
     fn build(self) -> Self::Output {
         let Self {
             source_url: Some(source_url),
