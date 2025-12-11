@@ -1,4 +1,4 @@
-allow-exact-repetitions = false
+allow-exact-repetitions = true
 check-private-items = true
 enforce-iter-loop-reborrow = true
 enum-variant-name-threshold = 1
