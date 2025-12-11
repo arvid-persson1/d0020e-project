@@ -28,7 +28,7 @@ enum BookFormatType {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename = "book")]
 ///The Book type
-pub(crate) struct Book {
+pub struct Book {
     ///The book title
     title: String,
     ///The book author
@@ -42,17 +42,17 @@ pub(crate) struct Book {
 #[derive(Debug, Serialize)]
 #[serde(rename = "books")]
 ///A `BookList` type that creates a root element for the XML output
-pub(crate) struct BookList {
+pub struct BookList {
     #[serde(rename = "book")]
     ///The books inside the book list
-    pub(crate) books: Vec<Book>,
+    pub books: Vec<Book>,
 }
 
 #[derive(Debug, Clone)]
 ///The Appstate
-pub(crate) struct AppState {
+pub struct AppState {
     ///The contents of `Appstate`
-    pub(crate) books: Arc<Mutex<Vec<Book>>>,
+    pub books: Arc<Mutex<Vec<Book>>>,
 }
 
 ///Fetches a list of all books
@@ -60,7 +60,7 @@ pub(crate) struct AppState {
 /// # Errors
 ///
 ///Returns a `500 Internal Server Error` to the client if the `Appstate` mutex is poisoned.
-pub(crate) async fn get_books(
+pub async fn get_books(
     State(state): State<Arc<AppState>>,
 ) -> Result<impl IntoResponse, StatusCode> {
     // map_err catches the "poison" error and converts it to a 500 code
@@ -82,7 +82,7 @@ pub(crate) async fn get_books(
 ///
 ///Returns a `500 Internal Server Error` to the client if the `Appstate` mutex is poisoned.
 ///Returns a `404 Not Found Error` to the client if it does not find a book with the given isbn.
-pub(crate) async fn get_book(
+pub async fn get_book(
     State(state): State<Arc<AppState>>,
     Path(isbn): Path<String>,
 ) -> impl IntoResponse {
@@ -110,7 +110,7 @@ pub(crate) async fn get_book(
 ///
 ///Returns a `500 Internal Server Error` to the client if the `AppState` Mutex gets poisoned
 ///(if for example another thread panics while holding the mutex lock)
-pub(crate) async fn add_book(
+pub async fn add_book(
     State(state): State<Arc<AppState>>,
     Xml(new_book): Xml<Book>,
 ) -> impl IntoResponse {
