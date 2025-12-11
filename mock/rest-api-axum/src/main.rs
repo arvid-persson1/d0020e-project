@@ -10,7 +10,10 @@
 ///API handlers and types
 pub mod handlers;
 
-use std::sync::{Arc, Mutex};
+use std::{
+    error::Error,
+    sync::{Arc, Mutex},
+};
 
 use axum::{
     Router,
@@ -20,9 +23,26 @@ use axum::{
 use handlers::{AppState, add_book, get_book, get_books};
 
 use tokio::net::TcpListener;
+use tokio::runtime::Builder;
 
-#[tokio::main]
-async fn main() {
+/// The application entry point.
+///
+/// # Errors
+/// Returns an error if the Tokio runtime cannot be initialized,
+/// if the TCP listener fails to bind, or if the server crashes.
+fn main() -> Result<(), Box<dyn Error>> {
+    let rt = Builder::new_multi_thread().enable_all().build()?;
+
+    rt.block_on(async_main())
+}
+
+///The actual async function with the async logic
+///
+/// # Errors
+///Returns an error if:
+/// * The TCP listener fails to bind to the address (e.g., port 1616 is already in use).
+/// * The Axum server fails to start or crashes during execution.
+async fn async_main() -> Result<(), Box<dyn Error>> {
     let books = vec![];
 
     let state = Arc::new(AppState {
@@ -39,8 +59,10 @@ async fn main() {
     //Define listener for axum (TCP: IP and port)
     let addrs = "127.0.0.1:1616";
     println!("App is listening on {addrs}");
-    let tcplisn = TcpListener::bind(addrs).await.unwrap();
+    let tcplisn = TcpListener::bind(addrs).await?;
 
     //Call axum serve to start the web server
-    axum::serve(tcplisn, app).await.unwrap();
+    axum::serve(tcplisn, app).await?;
+
+    Ok(())
 }
