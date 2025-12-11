@@ -60,6 +60,7 @@ pub struct AppState {
 /// # Errors
 ///
 ///Returns a `500 Internal Server Error` to the client if the `Appstate` mutex is poisoned.
+#[inline]
 pub async fn get_books(
     State(state): State<Arc<AppState>>,
 ) -> Result<impl IntoResponse, StatusCode> {
@@ -82,6 +83,7 @@ pub async fn get_books(
 ///
 ///Returns a `500 Internal Server Error` to the client if the `Appstate` mutex is poisoned.
 ///Returns a `404 Not Found Error` to the client if it does not find a book with the given isbn.
+#[inline]
 pub async fn get_book(
     State(state): State<Arc<AppState>>,
     Path(isbn): Path<String>,
@@ -110,6 +112,7 @@ pub async fn get_book(
 ///
 ///Returns a `500 Internal Server Error` to the client if the `AppState` Mutex gets poisoned
 ///(if for example another thread panics while holding the mutex lock)
+#[inline]
 pub async fn add_book(
     State(state): State<Arc<AppState>>,
     Xml(new_book): Xml<Book>,
