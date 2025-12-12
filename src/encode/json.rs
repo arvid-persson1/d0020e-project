@@ -113,6 +113,7 @@ where
     clippy::missing_panics_doc,
     reason = "Panics simply indicate failed tests."
 )]
+#[allow(clippy::unwrap_used, reason = "Panics simply indicate failed tests.")]
 mod tests {
     use super::*;
     use crate::errors::*;
