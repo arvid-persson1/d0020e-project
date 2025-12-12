@@ -89,8 +89,8 @@ impl From<ReqwestError> for ConnectionError {
 /// implement [`serde::de::Error`], e.g. [`serde::de::value::Error`], but that trait is not `dyn`
 /// compatible.
 #[derive(Debug, Error)]
-#[error(transparent)]
-pub struct DecodeError(#[from] pub BoxError);
+#[error("{0}")]
+pub struct DecodeError(#[source] pub BoxError);
 
 /// Errors that may occur when fetching entries. Created by methods of
 /// [`Source`](crate::connector::Source).
@@ -103,7 +103,7 @@ pub enum FetchError {
     /// Error occurred when processing query. The query was not valid or did not match the
     /// requested operation.
     // TODO: More information should be added here.
-    #[error("The query was not valid or did not match the requested operation.")]
+    #[error("The query was not valid or did not match the requested operation: {0}")]
     InvalidQuery(#[source] BoxError),
     /// Error occured during connection or communication.
     #[error(transparent)]
@@ -126,8 +126,8 @@ pub enum FetchOneError {
 /// An error that occured during encoding. The inner error is with many implementations likely to
 /// implement [`serde::ser::Error`], but that trait is not `dyn` compatible.
 #[derive(Debug, Error)]
-#[error(transparent)]
-pub struct EncodeError(#[from] pub BoxError);
+#[error("{0}")]
+pub struct EncodeError(#[source] pub BoxError);
 
 /// Errors that may occur when sending entries. Created by methods of
 /// [`Sink`](crate::connector::Sink).

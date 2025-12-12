@@ -21,7 +21,9 @@ impl Json {
     where
         T: ?Sized + Serialize,
     {
-        to_vec(value).map(Into::into).map_err(|_err| todo!())
+        to_vec(value)
+            .map(Into::into)
+            .map_err(|err| EncodeError(Box::new(err)))
     }
 }
 
@@ -88,7 +90,7 @@ where
 
     #[inline]
     fn decode_all(&self, bytes: &[u8]) -> Result<Vec<T>, DecodeError> {
-        from_slice(bytes).map_err(|_err| todo!())
+        from_slice(bytes).map_err(|err| DecodeError(Box::new(err)))
     }
 
     /// Decode a single entry from a slice, if one exists.
@@ -103,7 +105,9 @@ where
         if bytes.is_empty() {
             Ok(None)
         } else {
-            from_slice(bytes).map(Some).map_err(|_err| todo!())
+            from_slice(bytes)
+                .map(Some)
+                .map_err(|err| DecodeError(Box::new(err)))
         }
     }
 }
