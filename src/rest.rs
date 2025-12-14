@@ -137,7 +137,11 @@ where
     // `RequestBuilder::build` fails is the URL cannot be parsed. Although
     // `<Url as IntoUrl>::into_url` can fail, it has already been validated during construction
     // that this is not the case. Hence, this shouldn't fail.
-    let request = client.request(method, url).body(body).build().unwrap();
+    let request = client
+        .request(method, url)
+        .body(body)
+        .build()
+        .expect("URL failed to parse.");
     client.execute(request).await.map_err(Into::into)
 }
 
@@ -375,6 +379,7 @@ where
     clippy::missing_panics_doc,
     reason = "Panics simply indicate failed tests."
 )]
+#[allow(clippy::unwrap_used, reason = "Panics simply indicate failed tests.")]
 mod tests {
     use super::*;
     use crate::encode::json::Json;

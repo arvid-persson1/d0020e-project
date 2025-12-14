@@ -195,18 +195,19 @@ std_instead_of_alloc = "allow"
 std_instead_of_core = "allow"
 string_add = "allow"
 string_add_assign = "allow"
-todo = "allow"
 unchecked_time_subtraction = "allow"
-unimplemented = "allow"
-unreachable = "allow"
 unwrap_in_result = "allow"
-unwrap_used = "allow"
 # While this is bad, it's common in real code and promoting it to a warning would bloat diagnosis.
 multiple_crate_versions = "allow"
 # Poorly implemented.
 cognitive_complexity = "allow"
 # Many false positives.
 decimal_literal_representation = "allow"
+# Fine to use, but should be allowed with a `reason`. Prefer `expect` over `unwrap`.
+todo = "warn"
+unimplemented = "warn"
+unreachable = "warn"
+unwrap_used = "warn"
 # Suggestions. May need to be allowed frequently.
 if_not_else = "warn"
 into_iter_without_iter = "warn"

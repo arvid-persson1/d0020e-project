@@ -619,6 +619,7 @@ impl<T, Q, D, const SOURCE_METHOD: bool, const CLIENT: bool> Build
 {
     type Output = ReadOnly<T, Q, D>;
 
+    #[expect(clippy::unreachable, reason = "Invariants guarantee correctness.")]
     #[inline]
     fn build(self) -> Self::Output {
         let Self {
@@ -648,6 +649,7 @@ impl<T, Q, E, const SINK_METHOD: bool, const CLIENT: bool> Build
 {
     type Output = WriteOnly<T, E>;
 
+    #[expect(clippy::unreachable, reason = "Invariants guarantee correctness.")]
     #[inline]
     fn build(self) -> Self::Output {
         let Self {
@@ -677,6 +679,7 @@ impl<T, Q, E, D, const SOURCE_METHOD: bool, const SINK_METHOD: bool, const CLIEN
 {
     type Output = ReadWrite<T, Q, E, D, !>;
 
+    #[expect(clippy::unreachable, reason = "Invariants guarantee correctness.")]
     #[inline]
     fn build(self) -> Self::Output {
         let Self {
@@ -712,6 +715,7 @@ impl<T, Q, C, const SOURCE_METHOD: bool, const SINK_METHOD: bool, const CLIENT: 
 {
     type Output = ReadWrite<T, Q, !, !, C>;
 
+    #[expect(clippy::unreachable, reason = "Invariants guarantee correctness.")]
     #[inline]
     fn build(self) -> Self::Output {
         let Self {
