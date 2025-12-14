@@ -1,0 +1,15 @@
+[package]
+name = "schema_types"
+categories.workspace = true
+description.workspace = true
+edition.workspace = true
+keywords.workspace = true
+license.workspace = true
+readme.workspace = true
+repository.workspace = true
+version.workspace = true
+
+[dependencies]
+
+[lints]
+workspace = true
