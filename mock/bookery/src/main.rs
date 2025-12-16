@@ -65,7 +65,10 @@ struct AppState {
 /// # Panics
 /// Panics if acquiring the books mutex fails.
 async fn get_books(data: web::Data<AppState>) -> impl Responder {
-    let books = data.books.lock().unwrap();
+    let Ok(books) = data.books.lock() else {
+        return HttpResponse::InternalServerError().body("Failed to lock books");
+    };
+
     HttpResponse::Ok().json(&*books)
 }
 
@@ -74,7 +77,10 @@ async fn get_books(data: web::Data<AppState>) -> impl Responder {
 /// # Panics
 /// Panics if locking the mutex fails.
 async fn get_book(path: web::Path<Uuid>, data: web::Data<AppState>) -> impl Responder {
-    let books = data.books.lock().unwrap();
+    let Ok(books) = data.books.lock() else {
+        return HttpResponse::InternalServerError().body("Failed to lock books");
+    };
+
     books.iter().find(|b| b.id == *path).map_or_else(
         || HttpResponse::NotFound().body("Book not found"),
         |book| HttpResponse::Ok().json(book),
@@ -86,7 +92,9 @@ async fn get_book(path: web::Path<Uuid>, data: web::Data<AppState>) -> impl Resp
 /// # Panics
 /// Panics if locking the mutex fails.
 async fn create_book(book: web::Json<CreateBook>, data: web::Data<AppState>) -> impl Responder {
-    let mut books = data.books.lock().unwrap();
+    let Ok(mut books) = data.books.lock() else {
+        return HttpResponse::InternalServerError().body("Failed to lock books");
+    };
 
     let new_book = Book {
         id: Uuid::new_v4(),
@@ -97,7 +105,10 @@ async fn create_book(book: web::Json<CreateBook>, data: web::Data<AppState>) -> 
     };
 
     books.push(new_book);
-    HttpResponse::Created().json(books.last().unwrap())
+    books.last().map_or_else(
+        || HttpResponse::InternalServerError().body("Book creation failed"),
+        |created| HttpResponse::Created().json(created),
+    )
 }
 
 #[actix_web::main]
