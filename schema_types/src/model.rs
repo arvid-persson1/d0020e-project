@@ -5,7 +5,7 @@ pub enum Type {
     Class {
         name: String,
         // NOTE: Only names should be stored, makes instantiation easier.
-        subclass_of: Box<[String]>,
+        superclasses: Box<[String]>,
         description: String,
         // NOTE: Should only include those defined on the class directly, not on any of its
         // superclasses. These will be added during instantiation.
@@ -28,11 +28,11 @@ pub struct Property {
     name: String,
     description: String,
     // WARN: Must not be empty.
-    expected_types: Box<[String]>,
+    possible_types: Box<[String]>,
     // A tuple (class name, property name).
-    inverse_of: Option<(String, String)>,
-    // Superseded items should be marked as deprecated and link to their successor.
-    superseded_by: Option<String>,
+    inverse: Option<(String, String)>,
+    // Superseded items should be marked as deprecated and link to their superseder.
+    superseder: Option<String>,
     /* TODO: More data available? */
 }
 
@@ -52,13 +52,13 @@ impl PartialEq for Type {
             (
                 Self::Class {
                     name,
-                    subclass_of,
+                    superclasses,
                     description,
                     properties,
                 },
                 Self::Class {
                     name: other_name,
-                    subclass_of: other_subclass_of,
+                    superclasses: other_superclasses,
                     description: other_description,
                     properties: other_properties,
                 },
@@ -66,7 +66,7 @@ impl PartialEq for Type {
                 name == other_name && {
                     // Names should uniquely identify classes. Hence, if the names are equal, the types
                     // should be entirely equal.
-                    debug_assert!(subclass_of == other_subclass_of);
+                    debug_assert!(superclasses == other_superclasses);
                     debug_assert!(description == other_description);
                     debug_assert!(properties == other_properties);
                     true
@@ -114,17 +114,17 @@ impl PartialEq for Property {
         let Self {
             name,
             description,
-            expected_types,
-            inverse_of,
-            superseded_by,
+            possible_types,
+            inverse,
+            superseder,
         } = self;
         *name == other.name && {
             // Names should uniquely identify properties. Hence, if the names are equal, the
             // properties should be entirely equal.
             debug_assert!(*description == other.description);
-            debug_assert!(*expected_types == other.expected_types);
-            debug_assert!(*inverse_of == other.inverse_of);
-            debug_assert!(*superseded_by == other.superseded_by);
+            debug_assert!(*possible_types == other.possible_types);
+            debug_assert!(*inverse == other.inverse);
+            debug_assert!(*superseder == other.superseder);
             true
         }
     }
