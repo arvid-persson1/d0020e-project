@@ -1,5 +1,9 @@
 #![feature(never_type)]
 #![feature(type_changing_struct_update)]
+#![feature(adt_const_params)]
+// TODO: Can the lint be allowed for only this attribute?
+#![feature(unsized_const_params)]
+#![allow(incomplete_features)]
 
 //! The data broker.
 
@@ -17,3 +21,5 @@ pub mod connector;
 pub mod rest;
 
 pub mod encode;
+
+pub mod query;
