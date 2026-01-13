@@ -3,7 +3,8 @@
 use actix_web::{App, HttpResponse, HttpServer, Responder, web};
 use serde::{Deserialize, Serialize};
 use std::io::Result;
-use std::sync::Mutex;
+//use std::sync::Mutex;
+use parking_lot::Mutex;
 use uuid::Uuid;
 
 /// Available book formats
@@ -65,9 +66,7 @@ struct AppState {
 /// # Panics
 /// Panics if acquiring the books mutex fails.
 async fn get_books(data: web::Data<AppState>) -> impl Responder {
-    let Ok(books) = data.books.lock() else {
-        return HttpResponse::InternalServerError().body("Failed to lock books");
-    };
+    let books = data.books.lock();
 
     HttpResponse::Ok().json(&*books)
 }
@@ -77,9 +76,7 @@ async fn get_books(data: web::Data<AppState>) -> impl Responder {
 /// # Panics
 /// Panics if locking the mutex fails.
 async fn get_book(path: web::Path<Uuid>, data: web::Data<AppState>) -> impl Responder {
-    let Ok(books) = data.books.lock() else {
-        return HttpResponse::InternalServerError().body("Failed to lock books");
-    };
+    let books = data.books.lock();
 
     books.iter().find(|b| b.id == *path).map_or_else(
         || HttpResponse::NotFound().body("Book not found"),
@@ -92,9 +89,7 @@ async fn get_book(path: web::Path<Uuid>, data: web::Data<AppState>) -> impl Resp
 /// # Panics
 /// Panics if locking the mutex fails.
 async fn create_book(book: web::Json<CreateBook>, data: web::Data<AppState>) -> impl Responder {
-    let Ok(mut books) = data.books.lock() else {
-        return HttpResponse::InternalServerError().body("Failed to lock books");
-    };
+    let mut books = data.books.lock();
 
     let new_book = Book {
         id: Uuid::new_v4(),
