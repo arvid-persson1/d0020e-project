@@ -8,16 +8,16 @@ pub(crate) struct Query {
 
 #[Object]
 impl Query {
-    async fn get_book(&self, id: String) -> Option<Book> {
-        // This feels illegal, but all it does is return the element with the correpsonding id
-        self.db
-            .get_mock_data()
-            .iter()
-            .find(|&x| x.id.0 == id)
-            .cloned()
-    }
+    // async fn get_book(&self, isbn: String) -> Option<Book> {
+    // // Find book based on isbn
+    // self.db
+    // .get_mock_data()
+    // .iter()
+    // .find(|&x| x.isbn.0 == isbn)
+    // .cloned()
+    // }
 
     async fn get_all_books(&self) -> Vec<Book> {
-        self.db.get_mock_data()
+        self.db.get_all_books().await
     }
 }

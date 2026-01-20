@@ -1,48 +1,57 @@
 use crate::book_schema::{Book, BookFormatType};
-use async_graphql::ID;
+use sqlx::{Row, sqlite::SqlitePool};
 
-pub(crate) struct DB;
+#[derive(Clone)]
+pub(crate) struct DB {
+    pub pool: SqlitePool,
+}
 
-// Pretty much just a proof of concept for fetching.
-// Remeber to make it a real database later.
 impl DB {
-    pub(crate) fn get_mock_data(&self) -> Vec<Book> {
-        vec![
-            Book {
-                id: ID::from("1"),
-                title: "The Rust Programming Language".to_string(),
-                author: "Steve Klabnik and Carol Nichols".to_string(),
-                isbn: "978-1593278281".to_string(),
-                format: BookFormatType::Pdf,
-            },
-            Book {
-                id: ID::from("2"),
-                title: "Cracking the Coding Interview".to_string(),
-                author: "Gayle Laakmann McDowell".to_string(),
-                isbn: "978-0984782857".to_string(),
-                format: BookFormatType::Paperback,
-            },
-            Book {
-                id: ID::from("3"),
-                title: "Designing Data-Intensive Applications".to_string(),
-                author: "Martin Kleppmann".to_string(),
-                isbn: "978-1449373320".to_string(),
-                format: BookFormatType::Epub,
-            },
-            Book {
-                id: ID::from("4"),
-                title: "The Hitchhiker's Guide to the Galaxy".to_string(),
-                author: "Douglas Adams".to_string(),
-                isbn: "978-0345391803".to_string(),
-                format: BookFormatType::Hardcover,
-            },
-            Book {
-                id: ID::from("5"),
-                title: "Clean Code: A Handbook of Agile Software Craftsmanship".to_string(),
-                author: "Robert C. Martin".to_string(),
-                isbn: "978-0132350884".to_string(),
-                format: BookFormatType::Word,
-            },
-        ]
+    pub async fn new(db_path: &str) -> Self {
+        let url = format!("sqlite:{}?mode=rwc", db_path);
+        // This line makes me want to move to the top of a mountain and live in seclusion for five years.
+        let pool = SqlitePool::connect(&url)
+            .await
+            .expect("Failed to connect to database");
+
+        // println!("The pool set up correctly");
+
+        // This is to make sure the table actually exists, I hate that it gives me a warning
+        sqlx::query(
+            "CREATE TABLE IF NOT EXISTS book (
+                isbn TEXT PRIMARY KEY NOT NULL,
+                title TEXT NOT NULL,
+                author TEXT NOT NULL,
+                format TEXT NOT NULL
+            )",
+        )
+        .execute(&pool)
+        .await
+        .expect("Schema creation done diddly broke");
+
+        // Return value (rust moment)
+        Self { pool }
+    }
+
+    pub async fn get_all_books(&self) -> Vec<Book> {
+        let rows = sqlx::query("SELECT isbn, title, author, format FROM book")
+            .fetch_all(&self.pool)
+            .await
+            .unwrap_or_default();
+
+        rows.into_iter()
+            .map(|row| {
+                // Unholy solution to convert strings BookFormatType
+                let format_string: String = row.get("format");
+                let format: BookFormatType = format_string.parse().unwrap();
+
+                Book {
+                    isbn: row.get("isbn"),
+                    title: row.get("title"),
+                    author: row.get("author"),
+                    format,
+                }
+            })
+            .collect()
     }
 }
