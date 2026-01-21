@@ -6,24 +6,16 @@
 //! * Get a book by isbn (id)
 //! * Create a new book
 
-///Module for implementing the
-///API handlers and types
-pub mod handlers;
+use std::error::Error;
 
-use std::{
-    error::Error,
-    sync::{Arc, Mutex},
-};
+use axum_serde::Xml;
 
-use axum::{
-    Router,
-    routing::{get, post},
-};
-
-use handlers::{AppState, add_book, get_book, get_books};
+use serde::Serialize;
 
 use tokio::net::TcpListener;
 use tokio::runtime::Builder;
+
+use rest_api_axum::build_app;
 
 /// The application entry point.
 ///
@@ -43,18 +35,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 /// * The TCP listener fails to bind to the address (e.g., port 1616 is already in use).
 /// * The Axum server fails to start or crashes during execution.
 async fn async_main() -> Result<(), Box<dyn Error>> {
-    let books = vec![];
-
-    let state = Arc::new(AppState {
-        books: Arc::new(Mutex::new(books)),
-    });
-
     //Create router for axum
-    let app = Router::new()
-        .route("/books", get(get_books))
-        .route("/books", get(get_book))
-        .route("/books", post(add_book))
-        .with_state(state);
+    let app = build_app();
 
     //Define listener for axum (TCP: IP and port)
     let addrs = "127.0.0.1:1616";
@@ -66,3 +48,7 @@ async fn async_main() -> Result<(), Box<dyn Error>> {
 
     Ok(())
 }
+///Required to keep necessary dependencies
+type _KeepAxumSerdeDependency = Xml<()>;
+///Required to keep necessary dependencies
+type _KeepSerdeDependency = dyn Serialize;
