@@ -1,6 +1,10 @@
-use async_graphql::{Enum, InputObject, SimpleObject};
+//! A file containing all the structs and enums that build the GraphQL schema
+use async_graphql::{Enum, SimpleObject};
 use std::str::FromStr;
 
+// --- Needed for fetching ---
+// The book (isbn is used as identifier)
+// NOTE TO SELF: Double check which of theese derive things are needed in everything
 #[derive(SimpleObject, Clone, Debug)]
 pub(crate) struct Book {
     pub isbn: String,
@@ -9,7 +13,7 @@ pub(crate) struct Book {
     pub format: BookFormatType,
 }
 
-// Unsure which of these are actually used/needed (LOOK UP LATER)
+// The type that limits bookformats
 #[derive(Enum, Copy, Clone, Eq, PartialEq, Debug)]
 pub(crate) enum BookFormatType {
     Pdf,
@@ -19,23 +23,22 @@ pub(crate) enum BookFormatType {
     Paperback,
 }
 
-// This exists to limit the different bookformats
+// A way to convert BookFormatType to strings in order to store in database
 impl BookFormatType {
-    // This is my lazy way of making it easy to convert to
-    fn as_string(&self) -> &str {
+    pub fn as_string(&self) -> String {
         match self {
-            BookFormatType::Pdf => "Pdf",
-            BookFormatType::Word => "Word",
-            BookFormatType::Epub => "Epub",
-            BookFormatType::Hardcover => "Hardcover",
-            BookFormatType::Paperback => "Paperback",
+            BookFormatType::Pdf => "Pdf".to_string(),
+            BookFormatType::Word => "Word".to_string(),
+            BookFormatType::Epub => "Epub".to_string(),
+            BookFormatType::Hardcover => "Hardcover".to_string(),
+            BookFormatType::Paperback => "Paperback".to_string(),
         }
     }
 }
 
-// And this whole thing is just to make it simple to convert to BookFormatType
+// A way to convert string back to BookFormatType in order to fetch from database
 impl FromStr for BookFormatType {
-    type Err = ();
+    type Err = String;
 
     fn from_str(string: &str) -> Result<Self, Self::Err> {
         match string {
@@ -45,17 +48,9 @@ impl FromStr for BookFormatType {
             "Hardcover" => Ok(BookFormatType::Hardcover),
             "Paperback" => Ok(BookFormatType::Paperback),
             // Error if nothing (shouldn't happen without typos, so I won't handle for now)
-            _ => Err(()),
+            _ => Err("It seems you typoed".to_string()),
         }
     }
 }
 
-// Quite unsure if this is actually needed
-// You'll also need to remove the EmptyMutation when creating an instance of the schema.
-#[derive(InputObject)]
-struct BookInput {
-    isbn: String,
-    title: String,
-    author: String,
-    format: BookFormatType,
-}
+// NOTE TO SELF: You can create an InputObject, that (like it sounds) creates an object that's used for mutations instead of adding the values directly, but that shoulnd't be needed here.

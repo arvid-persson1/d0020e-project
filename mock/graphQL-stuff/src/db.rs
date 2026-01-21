@@ -1,3 +1,4 @@
+//! A file containing all functions that are needed for the database
 use crate::book_schema::{Book, BookFormatType};
 use sqlx::{Row, sqlite::SqlitePool};
 
@@ -7,14 +8,13 @@ pub(crate) struct DB {
 }
 
 impl DB {
+    // Sets up a database on the provided db_path containing a table for books
     pub async fn new(db_path: &str) -> Self {
         let url = format!("sqlite:{}?mode=rwc", db_path);
         // This line makes me want to move to the top of a mountain and live in seclusion for five years.
         let pool = SqlitePool::connect(&url)
             .await
             .expect("Failed to connect to database");
-
-        // println!("The pool set up correctly");
 
         // This is to make sure the table actually exists, I hate that it gives me a warning
         sqlx::query(
@@ -33,6 +33,7 @@ impl DB {
         Self { pool }
     }
 
+    // Returns an array of all Books within the database
     pub async fn get_all_books(&self) -> Vec<Book> {
         let rows = sqlx::query("SELECT isbn, title, author, format FROM book")
             .fetch_all(&self.pool)
@@ -53,5 +54,55 @@ impl DB {
                 }
             })
             .collect()
+    }
+
+    // Returns the first book with a matching isbn number within the database (the isbn is sensitive in that it has to be typed the exact way it's intended to)
+    pub async fn get_book(&self, isbn: String) -> Option<Book> {
+        let row = sqlx::query("SELECT isbn, title, author, format FROM book WHERE isbn = $1")
+            .bind(isbn)
+            .fetch_one(&self.pool)
+            .await;
+
+        match row {
+            Ok(row) => {
+                let format_string: String = row.get("format");
+                let format: BookFormatType = format_string.parse().unwrap();
+
+                Some(Book {
+                    isbn: row.get("isbn"),
+                    title: row.get("title"),
+                    author: row.get("author"),
+                    format,
+                })
+            },
+            Err(_) => None,
+        }
+    }
+
+    // Adds a book to the database, also returns a result if it worked out
+    pub async fn insert_book(
+        &self,
+        isbn: String,
+        title: String,
+        author: String,
+        format: String,
+    ) -> Result<Book, String> {
+        sqlx::query("INSERT INTO book (isbn, title, author, format) VALUES (?, ?, ?, ?)")
+            .bind(&isbn)
+            .bind(&title)
+            .bind(&author)
+            .bind(&format)
+            .execute(&self.pool)
+            .await
+            .map_err(|e| e.to_string())?;
+
+        // Return value (to know if it worked or not)
+        Ok(Book {
+            isbn,
+            title,
+            author,
+            // Since we return a Book we need to convert back to BookFormatType
+            format: format.parse().unwrap(),
+        })
     }
 }
