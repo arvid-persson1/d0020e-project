@@ -4,16 +4,25 @@ use proc_macro::TokenStream;
 use quote::quote;
 use syn::{Data, DeriveInput, Type, parse_macro_input};
 
+/// Derive macro to support queries on the type.
+///
+/// Concretely, this creates [`Field`](broker::query::Field) constructors for all of the struct's
+/// fields for type-safe field access with metadata like field name.
+///
+/// # Panics
+///
+/// Only structs with named fields are allowed. It is a compile-time error to use this on a tuple
+/// struct or enum type.
 #[proc_macro_derive(Queryable)]
 pub fn derive_queryable(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     let struct_name = &input.ident;
 
-    let Data::Struct(struct_) = input.data else {
+    let Data::Struct(r#struct) = input.data else {
         panic!("Queryable can only be derived for structure types.");
     };
 
-    let field_methods = struct_.fields.iter().map(|field| {
+    let field_methods = r#struct.fields.iter().map(|field| {
         // PERF: It's not actually necessary to perform a proper check of each field, since the
         // presence of one named field means it's a "classic" `struct` and all fields will be
         // named.

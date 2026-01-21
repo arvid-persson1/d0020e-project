@@ -3,7 +3,7 @@
 #![feature(adt_const_params)]
 // TODO: Can the lint be allowed for only this attribute?
 #![feature(unsized_const_params)]
-#![allow(incomplete_features)]
+#![expect(incomplete_features, reason = "Required for `unsized_const_params`.")]
 
 //! The data broker.
 
