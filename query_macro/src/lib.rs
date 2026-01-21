@@ -14,6 +14,7 @@ use syn::{Data, DeriveInput, Type, parse_macro_input};
 /// Only structs with named fields are allowed. It is a compile-time error to use this on a tuple
 /// struct or enum type.
 #[proc_macro_derive(Queryable)]
+#[expect(missing_inline_in_public_items, reason = "Procedural macro.")]
 pub fn derive_queryable(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     let struct_name = &input.ident;
