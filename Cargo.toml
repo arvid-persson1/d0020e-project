@@ -200,6 +200,9 @@ string_add = "allow"
 string_add_assign = "allow"
 unchecked_time_subtraction = "allow"
 unwrap_in_result = "allow"
+# While this produces shorter code, it is often desired to get a compile-time error when changing
+# types without changing operations on them.
+unneeded_field_pattern = "allow"
 # While this is bad, it's common in real code and promoting it to a warning would bloat diagnosis.
 multiple_crate_versions = "allow"
 # Poorly implemented.
@@ -346,7 +349,6 @@ unnecessary_safety_doc = "deny"
 unnecessary_semicolon = "deny"
 unnecessary_struct_initialization = "deny"
 unnecessary_wraps = "deny"
-unneeded_field_pattern = "deny"
 unnested_or_patterns = "deny"
 unreadable_literal = "deny"
 unseparated_literal_suffix = "deny"
