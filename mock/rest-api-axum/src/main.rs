@@ -5,17 +5,22 @@
 //! * Get a list of all books
 //! * Get a book by isbn (id)
 //! * Create a new book
+///Module for handler functions
+pub mod handlers;
 
+use serde as _;
 use std::error::Error;
 
-use axum_serde::Xml;
+//use axum_serde::Xml;
 
-use serde::Serialize;
+//use serde::Serialize;
 
 use tokio::net::TcpListener;
 use tokio::runtime::Builder;
 
-use rest_api_axum::build_app;
+pub mod app_builder;
+
+use app_builder::build_app;
 
 /// The application entry point.
 ///
@@ -48,7 +53,3 @@ async fn async_main() -> Result<(), Box<dyn Error>> {
 
     Ok(())
 }
-///Required to keep necessary dependencies
-type _KeepAxumSerdeDependency = Xml<()>;
-///Required to keep necessary dependencies
-type _KeepSerdeDependency = dyn Serialize;

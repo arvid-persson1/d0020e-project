@@ -1,9 +1,7 @@
 //!Libary file for the app construction logic
 ///Module for implementing the API handlers and types
-pub mod handlers;
-
-use tokio::net::TcpListener;
-
+//use tokio::net::TcpListener;
+//use tokio as _;
 use axum::{
     Router,
     routing::{get, post},
@@ -11,7 +9,7 @@ use axum::{
 
 use std::sync::{Arc, Mutex};
 
-use handlers::{AppState, add_book, get_book, get_books};
+use crate::handlers::{AppState, add_book, get_book, get_books};
 
 ///Builder function for the Router app
 #[inline]
@@ -30,5 +28,3 @@ pub fn build_app() -> Router {
 
     app
 }
-///f**k off
-type _KeepTokioDependency = TcpListener;
