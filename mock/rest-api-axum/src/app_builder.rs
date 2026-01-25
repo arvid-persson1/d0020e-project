@@ -7,9 +7,8 @@ use axum::{
     routing::{get, post},
 };
 
-use std::sync::{Arc, Mutex};
-
 use crate::handlers::{AppState, add_book, get_book, get_books};
+use std::sync::{Arc, Mutex};
 
 ///Builder function for the Router app
 #[inline]
@@ -22,7 +21,7 @@ pub fn build_app() -> Router {
 
     let app: Router = Router::new()
         .route("/books", get(get_books))
-        .route("/books{isbn}", get(get_book))
+        .route("/books/{isbn}", get(get_book))
         .route("/books", post(add_book))
         .with_state(state);
 

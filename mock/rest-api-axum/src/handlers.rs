@@ -39,7 +39,19 @@ pub(crate) struct Book {
     isbn: String,
 }
 
-#[derive(Debug, Serialize)]
+impl Book {
+    // This function only compiles when running 'cargo test'
+    #[cfg(test)]
+    pub(crate) fn get_title(&self) -> &str {
+        &self.title
+    }
+    #[cfg(test)]
+    pub(crate) fn get_isbn(&self) -> &str {
+        &self.isbn
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename = "books")]
 ///A `BookList` type that creates a root element for the XML output
 pub(crate) struct BookList {

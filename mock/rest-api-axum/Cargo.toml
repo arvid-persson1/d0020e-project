@@ -17,3 +17,7 @@ axum = "0.8.7"
 axum-serde = { version = "0.9.0", features = ["xml"] }
 serde = { version = "1.0.228", features = ["derive"] }
 tokio = { version = "1.49.0", features = ["full"] }
+
+[dev-dependencies]
+quick-xml = { version = "0.39.0", features = ["serialize"] }
+reqwest = "0.13.1"

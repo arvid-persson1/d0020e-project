@@ -8,18 +8,14 @@
 ///Module for handler functions
 pub mod handlers;
 
+#[cfg(test)]
+mod api_testing;
+
 use serde as _;
 use std::error::Error;
-
-//use axum_serde::Xml;
-
-//use serde::Serialize;
-
 use tokio::net::TcpListener;
 use tokio::runtime::Builder;
-
 pub mod app_builder;
-
 use app_builder::build_app;
 
 /// The application entry point.
@@ -29,7 +25,6 @@ use app_builder::build_app;
 /// if the TCP listener fails to bind, or if the server crashes.
 fn main() -> Result<(), Box<dyn Error>> {
     let rt = Builder::new_multi_thread().enable_all().build()?;
-
     rt.block_on(async_main())
 }
 
