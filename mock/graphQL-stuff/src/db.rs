@@ -85,13 +85,14 @@ impl DB {
         isbn: String,
         title: String,
         author: String,
-        format: String,
+        format: BookFormatType,
     ) -> Result<Book, String> {
+        let format_string = format.as_string();
         sqlx::query("INSERT INTO book (isbn, title, author, format) VALUES (?, ?, ?, ?)")
             .bind(&isbn)
             .bind(&title)
             .bind(&author)
-            .bind(&format)
+            .bind(&format_string)
             .execute(&self.pool)
             .await
             .map_err(|e| e.to_string())?;
@@ -101,8 +102,7 @@ impl DB {
             isbn,
             title,
             author,
-            // Since we return a Book we need to convert back to BookFormatType
-            format: format.parse().unwrap(),
+            format,
         })
     }
 }

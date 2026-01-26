@@ -1,12 +1,12 @@
 //! A file containing all the structs and enums that build the GraphQL schema
-use async_graphql::{Enum, SimpleObject};
+use async_graphql::{Enum, InputObject, SimpleObject};
 use std::str::FromStr;
 
 // --- Needed for fetching ---
 // The book (isbn is used as identifier)
 // NOTE TO SELF: Double check which of theese derive things are needed in everything
 #[derive(SimpleObject, Clone, Debug)]
-pub(crate) struct Book {
+pub struct Book {
     pub isbn: String,
     pub title: String,
     pub author: String,
@@ -15,7 +15,7 @@ pub(crate) struct Book {
 
 // The type that limits bookformats
 #[derive(Enum, Copy, Clone, Eq, PartialEq, Debug)]
-pub(crate) enum BookFormatType {
+pub enum BookFormatType {
     Pdf,
     Word,
     Epub,
@@ -54,3 +54,10 @@ impl FromStr for BookFormatType {
 }
 
 // NOTE TO SELF: You can create an InputObject, that (like it sounds) creates an object that's used for mutations instead of adding the values directly, but that shoulnd't be needed here.
+#[derive(InputObject)]
+pub struct BookInput {
+    pub isbn: String,
+    pub title: String,
+    pub author: String,
+    pub format: BookFormatType,
+}
