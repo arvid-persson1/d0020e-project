@@ -1,16 +1,18 @@
 //! A file containing all functions that are needed for the database
-use crate::book_schema::{Book, BookFormatType, BookInput};
-use sqlx::{Row, sqlite::SqlitePool};
+use crate::book_schema::{Book, BookInput};
+use sqlx::sqlite::SqlitePool;
 
+/// A struct representing the database
 #[derive(Clone)]
-pub(in crate) struct DB {
+pub struct Db {
+    /// The connection to the database
     pub pool: SqlitePool,
 }
 
-impl DB {
-    // Sets up a database on the provided db_path containing a table for books
+impl Db {
+    /// Sets up a database on the provided `db_path` containing a table for books
     pub async fn new(db_path: &str) -> Self {
-        let url = format!("sqlite:{}?mode=rwc", db_path);
+        let url = format!("sqlite:{db_path}?mode=rwc");
         // This line makes me want to move to the top of a mountain and live in seclusion for five years.
         let pool = SqlitePool::connect(&url)
             .await

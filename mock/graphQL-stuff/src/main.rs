@@ -1,5 +1,5 @@
 //! The GraphQL api
-use crate::db::DB;
+use crate::db::Db;
 use crate::queries::{Mutation, Query};
 use async_graphql::{EmptySubscription, Schema};
 use async_graphql_axum::{GraphQLRequest, GraphQLResponse};
@@ -24,7 +24,7 @@ async fn handler(
 #[tokio::main]
 async fn main() {
     // --- Setup database (I've made a struct for this) ---
-    let database = DB::new("./mock/graphQL-stuff/graphql_mock.db").await;
+    let database = Db::new("./mock/graphQL-stuff/graphql_mock.db").await;
     // Please note that the clone is needed for ownership
     let query = Query {
         db: database.clone(),

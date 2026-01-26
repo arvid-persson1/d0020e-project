@@ -1,11 +1,11 @@
 //! This might be a missleading name, but all it's just a file that contains the different ways you interact via GraphQL e.g mutations or queries.
 use crate::book_schema::{Book, BookInput};
-use crate::db::DB;
+use crate::db::Db;
 use async_graphql::{Object, Result};
 
 /// Struct used for GraphQL queries
 pub(in crate) struct Query {
-    pub db: DB,
+    pub db: Db,
 }
 
 #[Object]
@@ -40,7 +40,7 @@ impl Query {
 
 /// Struct used for GraphQL mutations
 pub(in crate) struct Mutation {
-    pub db: DB,
+    pub db: Db,
 }
 
 #[Object]
