@@ -3,8 +3,8 @@ use crate::book_schema::{Book, BookInput};
 use crate::db::DB;
 use async_graphql::{Object, Result};
 
-/// Queries are for recieving data via GraphQl
-pub struct Query {
+/// Struct used for GraphQL queries
+pub(in crate) struct Query {
     pub db: DB,
 }
 
@@ -38,8 +38,8 @@ impl Query {
     }
 }
 
-// While mutations are the for making writing or changing data via GraphQL
-pub struct Mutation {
+/// Struct used for GraphQL mutations
+pub(in crate) struct Mutation {
     pub db: DB,
 }
 
@@ -62,15 +62,10 @@ impl Mutation {
         // Book is shadowed here since we want values to return aswell.
         let book = self
             .db
-            .insert_book(book.isbn, book.title, book.author, book.format)
+            .insert_book(book)
             .await?;
         // Convert to book since that's the actual object
-        Ok(Book {
-            isbn: book.isbn,
-            title: book.title,
-            author: book.author,
-            format: book.format,
-        })
+        Ok(book)
     }
 
     /// GraphQL mutation that adds multiple books to the database
@@ -87,15 +82,10 @@ impl Mutation {
         for book in books {
             let current_book = self
                 .db
-                .insert_book(book.isbn, book.title, book.author, book.format)
+                .insert_book(book)
                 .await?;
-            // Convert the current_book to Book and push it to array of inserted books
-            inserted.push(Book {
-                isbn: current_book.isbn,
-                title: current_book.title,
-                author: current_book.author,
-                format: current_book.format,
-            });
+            // Add the inserted book to array of inserted books
+            inserted.push(current_book);
         }
 
         // Return array of all inserted books

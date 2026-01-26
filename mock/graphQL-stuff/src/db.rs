@@ -1,9 +1,9 @@
 //! A file containing all functions that are needed for the database
-use crate::book_schema::{Book, BookFormatType};
+use crate::book_schema::{Book, BookFormatType, BookInput};
 use sqlx::{Row, sqlite::SqlitePool};
 
 #[derive(Clone)]
-pub(crate) struct DB {
+pub(in crate) struct DB {
     pub pool: SqlitePool,
 }
 
@@ -35,74 +35,39 @@ impl DB {
 
     // Returns an array of all Books within the database
     pub async fn get_all_books(&self) -> Vec<Book> {
-        let rows = sqlx::query("SELECT isbn, title, author, format FROM book")
+        sqlx::query_as::<_, Book>("SELECT isbn, title, author, format FROM book")
             .fetch_all(&self.pool)
             .await
-            .unwrap_or_default();
-
-        rows.into_iter()
-            .map(|row| {
-                // Unholy solution to convert strings BookFormatType
-                let format_string: String = row.get("format");
-                let format: BookFormatType = format_string.parse().unwrap();
-
-                Book {
-                    isbn: row.get("isbn"),
-                    title: row.get("title"),
-                    author: row.get("author"),
-                    format,
-                }
-            })
-            .collect()
+            .unwrap_or_default()
     }
 
     // Returns the first book with a matching isbn number within the database (the isbn is sensitive in that it has to be typed the exact way it's intended to)
     pub async fn get_book(&self, isbn: String) -> Option<Book> {
-        let row = sqlx::query("SELECT isbn, title, author, format FROM book WHERE isbn = $1")
+        sqlx::query_as::<_, Book>("SELECT isbn, title, author, format FROM book WHERE isbn = $1")
             .bind(isbn)
-            .fetch_one(&self.pool)
-            .await;
-
-        match row {
-            Ok(row) => {
-                let format_string: String = row.get("format");
-                let format: BookFormatType = format_string.parse().unwrap();
-
-                Some(Book {
-                    isbn: row.get("isbn"),
-                    title: row.get("title"),
-                    author: row.get("author"),
-                    format,
-                })
-            },
-            Err(_) => None,
-        }
+            .fetch_optional(&self.pool)
+            .await
+            .ok()
+            .flatten()
     }
 
-    // Adds a book to the database, also returns a result if it worked out
-    pub async fn insert_book(
-        &self,
-        isbn: String,
-        title: String,
-        author: String,
-        format: BookFormatType,
-    ) -> Result<Book, String> {
-        let format_string = format.as_string();
+    /// Adds a book to the database, also returns the resulting book if it worked out
+    pub(in crate) async fn insert_book(&self, book: BookInput) -> Result<Book, String> {
         sqlx::query("INSERT INTO book (isbn, title, author, format) VALUES (?, ?, ?, ?)")
-            .bind(&isbn)
-            .bind(&title)
-            .bind(&author)
-            .bind(&format_string)
+            .bind(&book.isbn)
+            .bind(&book.title)
+            .bind(&book.author)
+            .bind(book.format)
             .execute(&self.pool)
             .await
             .map_err(|e| e.to_string())?;
 
         // Return value (to know if it worked or not)
         Ok(Book {
-            isbn,
-            title,
-            author,
-            format,
+            isbn: book.isbn,
+            title: book.title,
+            author: book.author,
+            format: book.format,
         })
     }
 }

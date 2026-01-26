@@ -1,21 +1,28 @@
 //! A file containing all the structs and enums that build the GraphQL schema
 use async_graphql::{Enum, InputObject, SimpleObject};
 use std::str::FromStr;
+use sqlx::{Type, FromRow};
 
 // --- Needed for fetching ---
+/// The representation of a book
 // The book (isbn is used as identifier)
-// NOTE TO SELF: Double check which of theese derive things are needed in everything
-#[derive(SimpleObject, Clone, Debug)]
-pub struct Book {
+#[derive(SimpleObject, Clone, Debug, FromRow)]
+pub(in crate) struct Book {
+    /// The isbn number of the book.
     pub isbn: String,
+    /// The title of the book.
     pub title: String,
+    /// The people who authored the book.
     pub author: String,
+    /// The format of the book.
     pub format: BookFormatType,
 }
 
-// The type that limits bookformats
-#[derive(Enum, Copy, Clone, Eq, PartialEq, Debug)]
-pub enum BookFormatType {
+/// Representation of the format of the book
+#[derive(Enum, Copy, Clone, Eq, PartialEq, Debug, Type)]
+// I was confused at first, but this just makes sqlx handle the enum as a lowercase string
+#[sqlx(type_name = "TEXT", rename_all = "lowercase")]
+pub(in crate) enum BookFormatType {
     Pdf,
     Word,
     Epub,
@@ -53,9 +60,10 @@ impl FromStr for BookFormatType {
     }
 }
 
-// NOTE TO SELF: You can create an InputObject, that (like it sounds) creates an object that's used for mutations instead of adding the values directly, but that shoulnd't be needed here.
+// --- Needed for inserting ---
+/// A representation of a book, but used specifically for inserts
 #[derive(InputObject)]
-pub struct BookInput {
+pub(in crate) struct BookInput {
     pub isbn: String,
     pub title: String,
     pub author: String,
