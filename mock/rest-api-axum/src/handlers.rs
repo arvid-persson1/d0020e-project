@@ -69,21 +69,21 @@ pub(crate) struct AppState {
 
 ///Fetches a list of all books
 ///
-/// # Errors
+///# Errors
 ///
 ///Returns a `500 Internal Server Error` to the client if the `Appstate` mutex is poisoned.
 #[inline]
 pub(crate) async fn get_books(
     State(state): State<Arc<AppState>>,
 ) -> Result<impl IntoResponse, StatusCode> {
-    // map_err catches the "poison" error and converts it to a 500 code
+    //map_err catches the "poison" error and converts it to a 500 code
     let books_vector = state
         .books
         .lock()
         .map_err(|_err| StatusCode::INTERNAL_SERVER_ERROR)?
         .clone();
 
-    // We wrap the response in BookList to satisfy the XML root element requirement
+    //We wrap the response in BookList to satisfy the XML root element requirement
     Ok(Xml(BookList {
         books: books_vector,
     }))
@@ -91,7 +91,7 @@ pub(crate) async fn get_books(
 
 ///Fetches a book by isbn (id)
 ///
-/// # Errors
+///# Errors
 ///
 ///Returns a `500 Internal Server Error` to the client if the `Appstate` mutex is poisoned.
 ///Returns a `404 Not Found Error` to the client if it does not find a book with the given isbn.
@@ -101,7 +101,7 @@ pub(crate) async fn get_book(
     Path(isbn): Path<String>,
 ) -> impl IntoResponse {
     let book_option = {
-        // If the lock fails, this returns Err(500) immediately.
+        //If the lock fails, this returns Err(500) immediately.
         let books_guard = state
             .books
             .lock()
@@ -120,7 +120,7 @@ pub(crate) async fn get_book(
 ///
 ///Returns the Statuscode CREATED when successfully creating a new book
 ///
-/// # Errors
+///# Errors
 ///
 ///Returns a `500 Internal Server Error` to the client if the `AppState` Mutex gets poisoned
 ///(if for example another thread panics while holding the mutex lock)
@@ -131,15 +131,15 @@ pub(crate) async fn add_book(
 ) -> impl IntoResponse {
     state.books.lock().map_or_else(
         |_| {
-            // The Mutex is poisoned (another thread panicked while holding it).
-            // We log the error (optional) and return a 500 error to the client.
+            //The Mutex is poisoned (another thread panicked while holding it).
+            //We log the error (optional) and return a 500 error to the client.
             eprintln!("ERROR: Mutex is poisoned!");
             Err(StatusCode::INTERNAL_SERVER_ERROR)
         },
         |mut books_guard| {
             // Success! We have the guard.
             books_guard.push(new_book.clone());
-            // Return the success tuple wrapped in Ok()
+            //Return the success tuple wrapped in Ok()
             Ok((StatusCode::CREATED, Xml(new_book)))
         },
     )
