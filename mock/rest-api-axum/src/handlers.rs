@@ -40,7 +40,7 @@ pub(crate) struct Book {
 }
 
 impl Book {
-    // This function only compiles when running 'cargo test'
+    //This function only compiles when running 'cargo test'
     #[cfg(test)]
     pub(crate) fn get_title(&self) -> &str {
         &self.title

@@ -5,9 +5,9 @@ use reqwest::header::CONTENT_TYPE;
 use std::net::SocketAddr;
 use tokio::net::TcpListener;
 
-/// # Panics
-/// Panics if the TCP listener cannot bind to the requested address
-/// or if the local address cannot be retrieved.
+///# Panics
+///Panics if the TCP listener cannot bind to the requested address
+///or if the local address cannot be retrieved.
 async fn spawn_app() -> SocketAddr {
     let listener = TcpListener::bind("127.0.0.1:0")
         .await
@@ -44,9 +44,9 @@ fn get_book2() -> &'static str {
 }
 
 #[tokio::test]
-/// # Panics
-/// Panics if the application cannot be spawned, the request fails,
-/// or the response status is not 201 CREATED.
+///# Panics
+///Panics if the application cannot be spawned, the request fails,
+///or the response status is not 201 CREATED.
 async fn book_test() {
     let addrs = spawn_app().await;
     let client = reqwest::Client::new();
@@ -62,12 +62,6 @@ async fn book_test() {
         .expect("Failed to send request");
 
     let status1 = post_reqst.status();
-
-    //Old debug code. REMOVE LATER!
-    //let body = post_reqst.text().await.expect("xyz");
-    //panic!(
-    //"Status: {status} \n Body: {body}"
-    //);
 
     assert_eq!(status1, 201);
 
