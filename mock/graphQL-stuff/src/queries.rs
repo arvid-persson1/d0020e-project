@@ -3,14 +3,15 @@ use crate::book_schema::{Book, BookInput};
 use crate::db::Db;
 use async_graphql::{Object, Result};
 
-/// Struct used for GraphQL queries
-pub(in crate) struct Query {
+/// Struct used for GraphQL queries.
+pub struct Query {
+    /// The database that's used in the queries.
     pub db: Db,
 }
 
 #[Object]
 impl Query {
-    /// GraphQL query that returns book with corresponding isbn number
+    /// GraphQL query that returns book with corresponding isbn number.
     ///
     /// Queries look might look like this:
     ///     query {
@@ -39,13 +40,14 @@ impl Query {
 }
 
 /// Struct used for GraphQL mutations
-pub(in crate) struct Mutation {
+pub(crate) struct Mutation {
+    /// The database that's used in the mutations.
     pub db: Db,
 }
 
 #[Object]
 impl Mutation {
-    /// GraphQL mutation that adds a book to the database (I chose to use BookFormatType here to avoid errors)
+    /// GraphQL mutation that adds a book to the database. `BookFormatType` was chosen here to avoid errors).
     ///
     /// When sending making the request you can write something like:
     /// mutation {
@@ -60,10 +62,7 @@ impl Mutation {
     /// }
     async fn insert_book(&self, book: BookInput) -> Result<Book> {
         // Book is shadowed here since we want values to return aswell.
-        let book = self
-            .db
-            .insert_book(book)
-            .await?;
+        let book = self.db.insert_book(book).await?;
         // Convert to book since that's the actual object
         Ok(book)
     }
@@ -80,10 +79,7 @@ impl Mutation {
         let mut inserted = vec![];
 
         for book in books {
-            let current_book = self
-                .db
-                .insert_book(book)
-                .await?;
+            let current_book = self.db.insert_book(book).await?;
             // Add the inserted book to array of inserted books
             inserted.push(current_book);
         }

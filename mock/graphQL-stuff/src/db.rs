@@ -4,7 +4,7 @@ use sqlx::sqlite::SqlitePool;
 
 /// A struct representing the database
 #[derive(Clone)]
-pub struct Db {
+pub(crate) struct Db {
     /// The connection to the database
     pub pool: SqlitePool,
 }
@@ -35,7 +35,7 @@ impl Db {
         Self { pool }
     }
 
-    // Returns an array of all Books within the database
+    /// Returns an array of all Books within the database
     pub async fn get_all_books(&self) -> Vec<Book> {
         sqlx::query_as::<_, Book>("SELECT isbn, title, author, format FROM book")
             .fetch_all(&self.pool)
@@ -43,7 +43,9 @@ impl Db {
             .unwrap_or_default()
     }
 
-    // Returns the first book with a matching isbn number within the database (the isbn is sensitive in that it has to be typed the exact way it's intended to)
+    /// Returns the book with a matching isbn number within the database. Note that:
+    /// - Since the isbn is the primary key there's a maximum of one matching row/book.
+    /// - The isbn number is syntax-sensitive, meaning it needs to be spelled the EXACT same way it is in the database.
     pub async fn get_book(&self, isbn: String) -> Option<Book> {
         sqlx::query_as::<_, Book>("SELECT isbn, title, author, format FROM book WHERE isbn = $1")
             .bind(isbn)
@@ -54,7 +56,7 @@ impl Db {
     }
 
     /// Adds a book to the database, also returns the resulting book if it worked out
-    pub(in crate) async fn insert_book(&self, book: BookInput) -> Result<Book, String> {
+    pub(crate) async fn insert_book(&self, book: BookInput) -> Result<Book, String> {
         sqlx::query("INSERT INTO book (isbn, title, author, format) VALUES (?, ?, ?, ?)")
             .bind(&book.isbn)
             .bind(&book.title)

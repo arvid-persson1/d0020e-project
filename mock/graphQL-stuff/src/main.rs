@@ -4,15 +4,16 @@ use crate::queries::{Mutation, Query};
 use async_graphql::{EmptySubscription, Schema};
 use async_graphql_axum::{GraphQLRequest, GraphQLResponse};
 use axum::{Router, extract::State, routing::post, serve};
+use tokio::net::TcpListener;
 
 mod book_schema;
 mod db;
 mod queries;
 
-// I'm lazy so this is just for the handler below
+/// A type introduced just to make the handler a bit more readable.
 type MySchema = Schema<Query, Mutation, EmptySubscription>;
 
-// The handler (that one guy that does stuff when making queries)
+/// The handler. It's the function that's run when there's a GraphQL request.
 async fn handler(
     State(schema): State<MySchema>,
     graphql_request: GraphQLRequest,
@@ -36,9 +37,7 @@ async fn main() {
     let app = Router::new()
         .route("/graphql", post(handler))
         .with_state(schema);
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:8081")
-        .await
-        .unwrap();
+    let listener = TcpListener::bind("127.0.0.1:8081").await.unwrap();
     println!("Server's on http://127.0.0.1:8081");
     serve(listener, app).await.unwrap();
 }

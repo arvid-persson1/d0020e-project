@@ -1,12 +1,12 @@
 //! A file containing all the structs and enums that build the GraphQL schema
 use async_graphql::{Enum, InputObject, SimpleObject};
-use sqlx::{Type, FromRow};
+use sqlx::{FromRow, Type};
 
 // --- Needed for fetching ---
 /// The representation of a book
 // The book (isbn is used as identifier)
 #[derive(SimpleObject, Clone, Debug, FromRow)]
-pub struct Book {
+pub(crate) struct Book {
     /// The isbn number of the book.
     pub isbn: String,
     /// The title of the book.
@@ -27,7 +27,7 @@ pub enum BookFormatType {
     Pdf,
     /// The format Word.
     Word,
-    /// The format EPUB. 
+    /// The format EPUB.
     Epub,
     /// The format Hardcover.
     Hardcover,
@@ -38,7 +38,7 @@ pub enum BookFormatType {
 // --- Needed for inserting ---
 /// A representation of a book, but used specifically for inserts
 #[derive(InputObject)]
-pub struct BookInput {
+pub(crate) struct BookInput {
     /// The isbn number of the book.
     pub isbn: String,
     /// The title of the book.
