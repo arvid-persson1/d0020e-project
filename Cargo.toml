@@ -14,7 +14,7 @@ workspace = true
 
 [workspace]
 resolver = "3"
-members = ["mock/bookery"]
+members = ["mock/bookery", "mock/rest-api-axum"]
 # members = ["mock/*"]
 
 [workspace.package]
