@@ -1,7 +1,7 @@
-//!Libary file for the app construction logic
-///Module for implementing the API handlers and types
-//use tokio::net::TcpListener;
-//use tokio as _;
+//! Libary file for the app construction logic
+/// Module for implementing the API handlers and types
+// use tokio::net::TcpListener;
+// use tokio as _;
 use axum::{
     Router,
     routing::{get, post},
@@ -10,7 +10,7 @@ use axum::{
 use crate::handlers::{AppState, add_book, get_book, get_books};
 use std::sync::{Arc, Mutex};
 
-///Builder function for the Router app
+/// Builder function for the Router app
 #[inline]
 pub fn build_app() -> Router {
     let books = vec![];
