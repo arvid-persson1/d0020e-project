@@ -4,7 +4,7 @@ use crate::db::Db;
 use async_graphql::{Object, Result};
 
 /// Struct used for GraphQL queries.
-pub struct Query {
+pub(crate) struct Query {
     /// The database that's used in the queries.
     pub db: Db,
 }
@@ -60,6 +60,8 @@ impl Mutation {
     ///         isbn
     ///     }
     /// }
+    /// # Errors
+    /// Returns error if the book didn't insert properly
     async fn insert_book(&self, book: BookInput) -> Result<Book> {
         // Book is shadowed here since we want values to return aswell.
         let book = self.db.insert_book(book).await?;
@@ -75,6 +77,8 @@ impl Mutation {
     ///	     format
     ///     }
     /// }
+    /// # Errors
+    /// Returns an error if any of the books couldn't be inserted properly
     async fn insert_books(&self, books: Vec<BookInput>) -> Result<Vec<Book>> {
         let mut inserted = vec![];
 

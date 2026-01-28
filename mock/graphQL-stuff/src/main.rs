@@ -1,4 +1,5 @@
-//! The GraphQL api
+//! A simple GraphQL api, that has the ability to insert and fetch data.
+//! Note that the data is persistent and a database needs to be removed to clear it.
 use crate::db::Db;
 use crate::queries::{Mutation, Query};
 use async_graphql::{EmptySubscription, Schema};
@@ -22,6 +23,8 @@ async fn handler(
     result.into()
 }
 
+/// # Panics
+/// Panics if the server couldn't bind to the provided url
 #[tokio::main]
 async fn main() {
     // --- Setup database (I've made a struct for this) ---

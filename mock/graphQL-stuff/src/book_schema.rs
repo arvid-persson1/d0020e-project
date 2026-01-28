@@ -8,13 +8,13 @@ use sqlx::{FromRow, Type};
 #[derive(SimpleObject, Clone, Debug, FromRow)]
 pub(crate) struct Book {
     /// The isbn number of the book.
-    pub isbn: String,
+    pub(crate) isbn: String,
     /// The title of the book.
-    pub title: String,
+    pub(crate) title: String,
     /// The people who authored the book.
-    pub author: String,
+    pub(crate) author: String,
     /// The format of the book.
-    pub format: BookFormatType,
+    pub(crate) format: BookFormatType,
 }
 
 /// Representation of the format of the book
@@ -22,7 +22,7 @@ pub(crate) struct Book {
 // I was confused at first, but this just makes sqlx handle the enum as a lowercase string
 // NOTE TO SELF: Why in the actual does this ALWAYS PRINT a warning?
 #[sqlx(type_name = "TEXT", rename_all = "lowercase")]
-pub enum BookFormatType {
+pub(crate) enum BookFormatType {
     /// The format PDF.
     Pdf,
     /// The format Word.
@@ -37,7 +37,7 @@ pub enum BookFormatType {
 
 // --- Needed for inserting ---
 /// A representation of a book, but used specifically for inserts
-#[derive(InputObject)]
+#[derive(InputObject, Clone, Debug)]
 pub(crate) struct BookInput {
     /// The isbn number of the book.
     pub isbn: String,

@@ -11,7 +11,9 @@ pub(crate) struct Db {
 
 impl Db {
     /// Sets up a database on the provided `db_path` containing a table for books
-    pub async fn new(db_path: &str) -> Self {
+    /// # Panics
+    /// Panics if the pool couldn't be set up correctly.
+    pub(crate) async fn new(db_path: &str) -> Self {
         let url = format!("sqlite:{db_path}?mode=rwc");
         // This line makes me want to move to the top of a mountain and live in seclusion for five years.
         let pool = SqlitePool::connect(&url)
@@ -36,7 +38,7 @@ impl Db {
     }
 
     /// Returns an array of all Books within the database
-    pub async fn get_all_books(&self) -> Vec<Book> {
+    pub(crate) async fn get_all_books(&self) -> Vec<Book> {
         sqlx::query_as::<_, Book>("SELECT isbn, title, author, format FROM book")
             .fetch_all(&self.pool)
             .await
@@ -46,7 +48,7 @@ impl Db {
     /// Returns the book with a matching isbn number within the database. Note that:
     /// - Since the isbn is the primary key there's a maximum of one matching row/book.
     /// - The isbn number is syntax-sensitive, meaning it needs to be spelled the EXACT same way it is in the database.
-    pub async fn get_book(&self, isbn: String) -> Option<Book> {
+    pub(crate) async fn get_book(&self, isbn: String) -> Option<Book> {
         sqlx::query_as::<_, Book>("SELECT isbn, title, author, format FROM book WHERE isbn = $1")
             .bind(isbn)
             .fetch_optional(&self.pool)
@@ -56,6 +58,8 @@ impl Db {
     }
 
     /// Adds a book to the database, also returns the resulting book if it worked out
+    /// # Errors
+    /// Returns an error if the query didn't execute properly.
     pub(crate) async fn insert_book(&self, book: BookInput) -> Result<Book, String> {
         sqlx::query("INSERT INTO book (isbn, title, author, format) VALUES (?, ?, ?, ?)")
             .bind(&book.isbn)
@@ -66,7 +70,7 @@ impl Db {
             .await
             .map_err(|e| e.to_string())?;
 
-        // Return value (to know if it worked or not)
+        // Return the input as a `Book` if everything worked out.
         Ok(Book {
             isbn: book.isbn,
             title: book.title,
