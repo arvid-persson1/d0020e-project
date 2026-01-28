@@ -26,7 +26,7 @@ async fn spawn_app() -> SocketAddr {
 }
 
 fn get_book1() -> &'static str {
-  "<book>
+    "<book>
     <title>Nineteen Eighty-Four</title>
     <author>George Orwell</author>
     <format>Hardcover</format>
@@ -35,7 +35,7 @@ fn get_book1() -> &'static str {
 }
 
 fn get_book2() -> &'static str {
-  "<book>
+    "<book>
     <title>The Last Wish: Introducing the Witcher</title>
     <author>Andrzej Sapkowski</author>
     <format>Hardcover</format>
