@@ -1,6 +1,8 @@
 //! This might be a missleading name, but all it's just a file that contains the different ways you interact via GraphQL e.g mutations or queries.
-use crate::book_schema::{Book, BookInput};
-use crate::db::Db;
+use crate::{
+    book_schema::{Book, BookInput},
+    db::Db,
+};
 use async_graphql::{Object, Result};
 
 /// Struct used for GraphQL queries.

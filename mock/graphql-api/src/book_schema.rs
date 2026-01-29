@@ -40,11 +40,11 @@ pub(crate) enum BookFormatType {
 #[derive(InputObject, Clone, Debug)]
 pub(crate) struct BookInput {
     /// The isbn number of the book.
-    pub isbn: String,
+    pub(crate) isbn: String,
     /// The title of the book.
-    pub title: String,
+    pub(crate) title: String,
     /// The people who authored the book.
-    pub author: String,
+    pub(crate) author: String,
     /// The format of the book.
-    pub format: BookFormatType,
+    pub(crate) format: BookFormatType,
 }

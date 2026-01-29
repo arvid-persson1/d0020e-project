@@ -1,15 +1,17 @@
 //! A simple GraphQL api, that has the ability to insert and fetch data.
 //! Note that the data is persistent and a database needs to be removed to clear it.
-use crate::db::Db;
-use crate::queries::{Mutation, Query};
+use crate::{
+    db::Db,
+    queries::{Mutation, Query},
+};
 use async_graphql::{EmptySubscription, Schema};
 use async_graphql_axum::{GraphQLRequest, GraphQLResponse};
 use axum::{Router, extract::State, routing::post, serve};
 use tokio::net::TcpListener;
 
-mod book_schema;
-mod db;
-mod queries;
+pub mod book_schema;
+pub mod db;
+pub mod queries;
 
 /// A type introduced just to make the handler a bit more readable.
 type MySchema = Schema<Query, Mutation, EmptySubscription>;
@@ -40,7 +42,9 @@ async fn main() {
     let app = Router::new()
         .route("/graphql", post(handler))
         .with_state(schema);
-    let listener = TcpListener::bind("127.0.0.1:8081").await.unwrap();
+    let listener = TcpListener::bind("127.0.0.1:8081")
+        .await
+        .expect("Unable to bind ip address");
     println!("Server's on http://127.0.0.1:8081");
-    serve(listener, app).await.unwrap();
+    serve(listener, app).await.expect("Unable to start server");
 }
