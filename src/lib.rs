@@ -1,1 +1,19 @@
-#![allow(missing_docs, clippy::missing_docs_in_private_items, reason = "TODO")]
+#![feature(never_type)]
+#![feature(type_changing_struct_update)]
+
+//! The data broker.
+
+// TODO: Rework module visibility, nesting, public exports.
+
+// Currently, `tokio` is only used by tests. It will be used more later, so instead of making
+// it a test-only dependency for the time being, this is added temporarily to suppress warnings.
+// TODO: Remove.
+use tokio as _;
+
+pub mod errors;
+
+pub mod connector;
+
+pub mod rest;
+
+pub mod encode;
