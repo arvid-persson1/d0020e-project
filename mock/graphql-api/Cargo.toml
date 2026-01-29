@@ -1,5 +1,5 @@
 [package]
-name = "graphQL-stuff"
+name = "graphql-api"
 categories.workspace = true
 description.workspace = true
 edition.workspace = true

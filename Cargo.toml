@@ -14,7 +14,7 @@ workspace = true
 
 [workspace]
 resolver = "3"
-members = ["mock/graphQL-stuff"]
+members = ["mock/graphql-api"]
 # members = ["mock/*"]
 
 [workspace.package]

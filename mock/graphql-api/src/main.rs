@@ -28,7 +28,7 @@ async fn handler(
 #[tokio::main]
 async fn main() {
     // --- Setup database (I've made a struct for this) ---
-    let database = Db::new("./mock/graphQL-stuff/graphql_mock.db").await;
+    let database = Db::new("./mock/graphql-api/graphql_mock.db").await;
     // Please note that the clone is needed for ownership
     let query = Query {
         db: database.clone(),

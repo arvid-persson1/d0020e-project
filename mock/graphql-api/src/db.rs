@@ -20,8 +20,8 @@ impl Db {
             .await
             .expect("Failed to connect to database");
 
-        // This is to make sure the table actually exists, I hate that it gives me a warning
-        sqlx::query(
+        // This is to make sure the table actually exists. Note that I don't actually want to use the query result.
+        let _ = sqlx::query(
             "CREATE TABLE IF NOT EXISTS book (
                 isbn TEXT PRIMARY KEY NOT NULL,
                 title TEXT NOT NULL,
@@ -31,7 +31,7 @@ impl Db {
         )
         .execute(&pool)
         .await
-        .expect("Schema creation done diddly broke");
+        .expect("Schema creation broke");
 
         // Return value (rust moment)
         Self { pool }
@@ -61,7 +61,8 @@ impl Db {
     /// # Errors
     /// Returns an error if the query didn't execute properly.
     pub(crate) async fn insert_book(&self, book: BookInput) -> Result<Book, String> {
-        sqlx::query("INSERT INTO book (isbn, title, author, format) VALUES (?, ?, ?, ?)")
+        // Note that we don't want the query result since all we're doing is inserting
+        let _ = sqlx::query("INSERT INTO book (isbn, title, author, format) VALUES (?, ?, ?, ?)")
             .bind(&book.isbn)
             .bind(&book.title)
             .bind(&book.author)
