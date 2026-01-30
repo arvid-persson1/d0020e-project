@@ -39,6 +39,7 @@ use syn::{Data, DeriveInput, parse_macro_input};
 ///
 /// These constraints are required to generate valid field accessors.
 #[proc_macro_derive(Queryable)]
+#[inline]
 pub fn derive_queryable(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     let struct_name = &input.ident;

@@ -17,89 +17,107 @@ use trybuild as _;
 
 use broker::query::*;
 
-/// Book format variants.
-#[derive(Debug, PartialEq)]
-enum BookFormatType {
-    Hardcover,
-    Paperback,
-    Ebook,
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use trybuild as _;
 
-/// Simple ISBN wrapper.
-#[derive(Debug, PartialEq, Queryable)]
-struct Isbn {
-    value: String,
-}
+    /// Book format variants.
+    #[derive(Debug, PartialEq)]
+    enum BookFormatType {
+        Hardcover,
+        Paperback,
+        Ebook,
+    }
 
-#[derive(Queryable)]
-struct Book {
-    title: String,
-    author: String,
-    format: BookFormatType,
-    isbn: Isbn,
-}
+    /// Simple ISBN wrapper.
+    #[derive(Debug, PartialEq, Queryable)]
+    struct Isbn {
+        value: String,
+    }
 
-#[test]
-fn simple_field_eq() {
-    let title = "The Rust Programming Language".to_string();
-    let q = Book::title().eq(&title);
+    #[derive(Queryable)]
+    struct Book {
+        title: String,
+        author: String,
+        format: BookFormatType,
+        isbn: Isbn,
+    }
 
-    let book = Book {
-        title: "The Rust Programming Language".into(),
-        author: "Steve Klabnik & Carol Nichols".into(),
-        format: BookFormatType::Hardcover,
-        isbn: Isbn {
-            value: "978-1593278281".into(),
-        },
-    };
+    /// # Panics
+    ///
+    /// Panics if the query evaluation fails.
+    #[test]
+    fn simple_field_eq() {
+        let title = "The Rust Programming Language".to_owned();
+        let q = Book::title().eq(&title);
 
-    assert!(q.evaluate(&book));
-}
+        let book = Book {
+            title: "The Rust Programming Language".into(),
+            author: "Steve Klabnik & Carol Nichols".into(),
+            format: BookFormatType::Hardcover,
+            isbn: Isbn {
+                value: "978-1593278281".into(),
+            },
+        };
 
-#[test]
-fn enum_field_eq() {
-    let q = Book::format().eq(&BookFormatType::Ebook);
+        assert!(q.evaluate(&book));
+    }
 
-    let book = Book {
-        title: "Rust for Professionals".into(),
-        author: "Jane Doe".into(),
-        format: BookFormatType::Ebook,
-        isbn: Isbn {
-            value: "978-0000000000".into(),
-        },
-    };
+    /// # Panics
+    ///
+    /// Panics if the query evaluation fails.
+    #[test]
+    fn enum_field_eq() {
+        let q = Book::format().eq(&BookFormatType::Ebook);
 
-    assert!(q.evaluate(&book));
-}
+        let book = Book {
+            title: "Rust for Professionals".into(),
+            author: "Jane Doe".into(),
+            format: BookFormatType::Ebook,
+            isbn: Isbn {
+                value: "978-0000000000".into(),
+            },
+        };
 
-#[test]
-fn nested_field_eq() {
-    let q = Book::isbn().then(&Isbn::value()).eq("978-1593278281");
+        assert!(q.evaluate(&book));
+    }
 
-    let book = Book {
-        title: "The Rust Programming Language".into(),
-        author: "Steve Klabnik & Carol Nichols".into(),
-        format: BookFormatType::Paperback,
-        isbn: Isbn {
-            value: "978-1593278281".into(),
-        },
-    };
+    /// # Panics
+    ///
+    /// Panics if the query evaluation fails.
+    #[test]
+    fn nested_field_eq() {
+        let q = Book::isbn().then(&Isbn::value()).eq("978-1593278281");
 
-    assert!(q.evaluate(&book));
-}
+        let book = Book {
+            title: "The Rust Programming Language".into(),
+            author: "Steve Klabnik & Carol Nichols".into(),
+            format: BookFormatType::Paperback,
+            isbn: Isbn {
+                value: "978-1593278281".into(),
+            },
+        };
 
-#[test]
-fn author_eq() {
-    let q = Book::author().eq("Steve Klabnik & Carol Nichols");
+        assert!(q.evaluate(&book));
+    }
 
-    let book = Book {
-        title: "The Rust Programming Language".into(),
-        author: "Steve Klabnik & Carol Nichols".into(),
-        format: BookFormatType::Paperback,
-        isbn: Isbn {
-            value: "978-1593278281".into(),
-        },
-    };
+    /// # Panics
+    ///
+    /// Panics if the query evaluation fails.
+    #[test]
+    fn author_eq() {
+        let q = Book::author().eq("Steve Klabnik & Carol Nichols");
 
-    assert!(q.evaluate(&book));
+        let book = Book {
+            title: "The Rust Programming Language".into(),
+            author: "Steve Klabnik & Carol Nichols".into(),
+            format: BookFormatType::Paperback,
+            isbn: Isbn {
+                value: "978-1593278281".into(),
+            },
+        };
+
+        assert!(q.evaluate(&book));
+    }
 }

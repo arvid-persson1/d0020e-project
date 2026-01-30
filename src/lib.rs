@@ -14,7 +14,7 @@
 // TODO: Remove.
 use tokio as _;
 
-#[allow(unused_imports)]
+#[allow(unused_imports, reason = "Dev dependencies used in tests only")]
 // Silence unused-crate-dependencies for dev-dependency `trybuild`
 #[cfg(test)]
 use trybuild as _;
