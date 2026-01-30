@@ -72,5 +72,5 @@ pub fn derive_queryable(input: TokenStream) -> TokenStream {
             #(#field_methods)*
         }
     }
-        .into()
+    .into()
 }

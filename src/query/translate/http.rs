@@ -5,7 +5,6 @@
 //! possible, unsupported parts of the query are returned as *residue* and
 //! must be evaluated locally after fetching data.
 
-
 use super::{
     super::{
         Field,
@@ -67,7 +66,8 @@ impl<T> ToHttp<T> for True {
 
 impl<T, U> ToHttp<T> for Eq<'_, Field<T, U>, U>
 where
-    U: PartialEq + Display + ?Sized, for<'a> &'a U: PartialEq<U>
+    U: PartialEq + Display + ?Sized,
+    for<'a> &'a U: PartialEq<U>,
 {
     /// Returns a query with one parameter, that being the field name and `value.to_string()`, and
     /// no residue.
@@ -92,7 +92,8 @@ where
 
 impl<T, U> ToHttp<T> for Ne<'_, Field<T, U>, U>
 where
-    U: PartialEq + ?Sized, for<'a> &'a U: PartialEq<U>
+    U: PartialEq + ?Sized,
+    for<'a> &'a U: PartialEq<U>,
 {
     /// Returns a single query with no parameters, meaning **this entire (sub)query remains as
     /// residue**.

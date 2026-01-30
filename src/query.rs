@@ -8,9 +8,8 @@
 //! - Translated into HTTP parameters via [`ToHttp`]
 
 pub use query_macro::Queryable;
-use std::sync::Arc;
 use std::fmt;
-
+use std::sync::Arc;
 
 /// Query primitives and combinators.
 mod combinators;
@@ -18,8 +17,8 @@ pub use combinators::*;
 
 /// Translation of queries into other formats.
 mod translate;
-pub use translate::*;
 pub use crate::query::translate::ToHttp;
+pub use translate::*;
 
 /// Concatenate two field-name segments into a dotted path.
 /// Example: "address" + "city" -> "address.city"
@@ -54,10 +53,7 @@ impl<T: ?Sized, U: ?Sized> fmt::Debug for Field<T, U> {
 impl<T: ?Sized + 'static, U: ?Sized + 'static> Field<T, U> {
     /// Construct a new Field from a name and getter function.
     #[inline]
-    pub fn new(
-        name: &'static str,
-        getter: impl Fn(&T) -> &U + Send + Sync + 'static,
-    ) -> Self {
+    pub fn new(name: &'static str, getter: impl Fn(&T) -> &U + Send + Sync + 'static) -> Self {
         Self {
             name,
             getter: Arc::new(getter),

@@ -48,8 +48,9 @@ fn simple_field_eq() {
         title: "The Rust Programming Language".into(),
         author: "Steve Klabnik & Carol Nichols".into(),
         format: BookFormatType::Hardcover,
-        isbn: Isbn{
-            value: "978-1593278281".into()},
+        isbn: Isbn {
+            value: "978-1593278281".into(),
+        },
     };
 
     assert!(q.evaluate(&book));
@@ -63,8 +64,9 @@ fn enum_field_eq() {
         title: "Rust for Professionals".into(),
         author: "Jane Doe".into(),
         format: BookFormatType::Ebook,
-        isbn: Isbn{
-            value: "978-0000000000".into()},
+        isbn: Isbn {
+            value: "978-0000000000".into(),
+        },
     };
 
     assert!(q.evaluate(&book));
@@ -78,8 +80,9 @@ fn nested_field_eq() {
         title: "The Rust Programming Language".into(),
         author: "Steve Klabnik & Carol Nichols".into(),
         format: BookFormatType::Paperback,
-        isbn: Isbn{
-            value: "978-1593278281".into()},
+        isbn: Isbn {
+            value: "978-1593278281".into(),
+        },
     };
 
     assert!(q.evaluate(&book));
@@ -100,4 +103,3 @@ fn author_eq() {
 
     assert!(q.evaluate(&book));
 }
-
