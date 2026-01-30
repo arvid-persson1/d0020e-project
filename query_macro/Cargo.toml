@@ -13,6 +13,9 @@ version.workspace = true
 quote = { version = "1.0.42", default-features = false }
 syn = { default-features = false, version = "2.0.111", features = ["derive", "parsing", "proc-macro"] }
 
+[dev-dependencies]
+trybuild = "1.0.114"
+
 [lints]
 workspace = true
 

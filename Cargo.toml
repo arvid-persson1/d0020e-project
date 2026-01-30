@@ -65,6 +65,9 @@ thiserror = "2.0.17"
 tokio = { features = ["macros"], version = "1.48.0" }
 transitive = "1.2.0"
 
+[dev-dependencies]
+trybuild = "1.0.114"
+
 [workspace.lints.rust]
 # Core language features and proper use of common APIs.
 ambiguous_negative_literals = "allow"

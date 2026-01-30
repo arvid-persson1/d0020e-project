@@ -1,3 +1,11 @@
+//! Translation of query expressions into HTTP query parameters.
+//!
+//! This module provides [`ToHttp`], which attempts to convert a query into
+//! one or more HTTP-compatible parameter sets. When full translation is not
+//! possible, unsupported parts of the query are returned as *residue* and
+//! must be evaluated locally after fetching data.
+
+
 use super::{
     super::{
         Field,
@@ -57,9 +65,9 @@ impl<T> ToHttp<T> for True {
     }
 }
 
-impl<T, U, const NAME: &'static str> ToHttp<T> for Eq<'_, Field<T, U, NAME>, U>
+impl<T, U> ToHttp<T> for Eq<'_, Field<T, U>, U>
 where
-    U: PartialEq + Display + ?Sized,
+    U: PartialEq + Display + ?Sized, for<'a> &'a U: PartialEq<U>
 {
     /// Returns a query with one parameter, that being the field name and `value.to_string()`, and
     /// no residue.
@@ -67,7 +75,7 @@ where
     fn to_http_single(&self) -> Single<'_, HttpQuery, T> {
         let Self { field: _, value } = self;
         Single {
-            query: vec![(NAME, value.to_string().into())],
+            query: vec![(self.field.name, value.to_string().into())],
             residue: Vec::new(),
         }
     }
@@ -77,14 +85,14 @@ where
     #[inline]
     fn to_http_multi(&self) -> Option<Vec<HttpQuery>> {
         let Self { field: _, value } = self;
-        let query = vec![(NAME, value.to_string().into())];
+        let query = vec![(self.field.name, value.to_string().into())];
         Some(vec![query])
     }
 }
 
-impl<T, U, const NAME: &'static str> ToHttp<T> for Ne<'_, Field<T, U, NAME>, U>
+impl<T, U> ToHttp<T> for Ne<'_, Field<T, U>, U>
 where
-    U: PartialEq + ?Sized,
+    U: PartialEq + ?Sized, for<'a> &'a U: PartialEq<U>
 {
     /// Returns a single query with no parameters, meaning **this entire (sub)query remains as
     /// residue**.
@@ -103,7 +111,7 @@ where
     }
 }
 
-impl<T, U, const NAME: &'static str> ToHttp<T> for Gt<'_, Field<T, U, NAME>, U>
+impl<T, U> ToHttp<T> for Gt<'_, Field<T, U>, U>
 where
     U: PartialOrd + ?Sized,
 {
@@ -124,7 +132,7 @@ where
     }
 }
 
-impl<T, U, const NAME: &'static str> ToHttp<T> for Lt<'_, Field<T, U, NAME>, U>
+impl<T, U> ToHttp<T> for Lt<'_, Field<T, U>, U>
 where
     U: PartialOrd + ?Sized,
 {

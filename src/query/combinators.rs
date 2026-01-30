@@ -1,3 +1,9 @@
+//! Query primitives and logical combinators.
+//!
+//! This module defines the core query abstract syntax tree (AST) and the
+//! semantics for evaluating queries against in-memory data. Queries are
+//! composable, immutable, and evaluated recursively.
+
 use super::Field;
 use either::Either;
 use nameof::{name_of, name_of_type};
@@ -10,39 +16,47 @@ use std::fmt::{Debug, Error as FmtError, Formatter};
 pub struct True;
 
 /// Checks if the field specified by `field` is equal to `value`.
+///
+/// This is a pure query node and does not perform any evaluation by itself.
 #[derive(Clone)]
-pub struct Eq<'a, F, U: ?Sized> {
+pub struct Eq<'a, F, V: ?Sized> {
     /// The field to check equality on.
     pub(super) field: F,
     /// The value to compare the field to.
-    pub(super) value: &'a U,
+    pub(super) value: &'a V,
 }
 
 /// Checks if the field specified by `field` is not equal to `value`.
+///
+/// This is a pure query node and does not perform any evaluation by itself.
 #[derive(Clone)]
-pub struct Ne<'a, F, U: ?Sized> {
+pub struct Ne<'a, F, V: ?Sized> {
     /// The field to check inequality on.
     pub(super) field: F,
     /// The value to compare the field to.
-    pub(super) value: &'a U,
+    pub(super) value: &'a V,
 }
 
 /// Checks if the field specified by `field` is greater than `value`.
+///
+/// This is a pure query node and does not perform any evaluation by itself.
 #[derive(Clone)]
-pub struct Gt<'a, F, U: ?Sized> {
+pub struct Gt<'a, F, V: ?Sized> {
     /// The field to perform comparison on.
     pub(super) field: F,
     /// The value to compare the field to.
-    pub(super) value: &'a U,
+    pub(super) value: &'a V,
 }
 
 /// Checks if the field specified by `field` is lesser than `value`.
+///
+/// This is a pure query node and does not perform any evaluation by itself.
 #[derive(Clone)]
-pub struct Lt<'a, F, U: ?Sized> {
+pub struct Lt<'a, F, V: ?Sized> {
     /// The field to perform comparison on.
     pub(super) field: F,
     /// The value to compare the field to.
-    pub(super) value: &'a U,
+    pub(super) value: &'a V,
 }
 
 /// Performs AND on the two subqueries.
@@ -88,59 +102,51 @@ impl<T> Query<T> for True {
     }
 }
 
-impl<T, U, const NAME: &'static str> Query<T> for Eq<'_, Field<T, U, NAME>, U>
+impl<T, U, V> Query<T> for Eq<'_, Field<T, U>, V>
 where
-    U: PartialEq + ?Sized,
+    U: PartialEq<V> + ?Sized,
+    V: ?Sized,
 {
     #[inline]
     fn evaluate(&self, data: &T) -> bool {
-        let Self {
-            field: Field { getter },
-            value,
-        } = self;
-        getter(data) == *value
+        let field_val: &U = (self.field.getter)(data);
+        field_val == self.value
     }
 }
 
-impl<T, U, const NAME: &'static str> Query<T> for Ne<'_, Field<T, U, NAME>, U>
+impl<T, U, V> Query<T> for Ne<'_, Field<T, U>, V>
 where
-    U: PartialEq + ?Sized,
+    U: PartialEq<V> + ?Sized,
+    V: ?Sized,
 {
     #[inline]
     fn evaluate(&self, data: &T) -> bool {
-        let Self {
-            field: Field { getter },
-            value,
-        } = self;
-        getter(data) != *value
+        let field_val: &U = (self.field.getter)(data);
+        field_val != self.value
     }
 }
 
-impl<T, U, const NAME: &'static str> Query<T> for Gt<'_, Field<T, U, NAME>, U>
+impl<T, U, V> Query<T> for Gt<'_, Field<T, U>, V>
 where
-    U: PartialOrd + ?Sized,
+    U: PartialOrd<V> + ?Sized,
+    V: ?Sized,
 {
     #[inline]
     fn evaluate(&self, data: &T) -> bool {
-        let Self {
-            field: Field { getter },
-            value,
-        } = self;
-        getter(data) > *value
+        let field_val: &U = (self.field.getter)(data);
+        field_val > self.value
     }
 }
 
-impl<T, U, const NAME: &'static str> Query<T> for Lt<'_, Field<T, U, NAME>, U>
+impl<T, U, V> Query<T> for Lt<'_, Field<T, U>, V>
 where
-    U: PartialOrd + ?Sized,
+    U: PartialOrd<V> + ?Sized,
+    V: ?Sized,
 {
     #[inline]
     fn evaluate(&self, data: &T) -> bool {
-        let Self {
-            field: Field { getter },
-            value,
-        } = self;
-        getter(data) < *value
+        let field_val: &U = (self.field.getter)(data);
+        field_val < self.value
     }
 }
 
@@ -205,6 +211,10 @@ where
     }
 }
 
+// NOTE:
+// Debug implementations support two formats:
+// - Standard (`{:?}`): structured, machine-readable
+// - Alternate (`{:#?}`): compact, human-readable query syntax
 impl Debug for True {
     #[inline]
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), FmtError> {
@@ -216,7 +226,7 @@ impl Debug for True {
     }
 }
 
-impl<T, V, U, const NAME: &'static str> Debug for Eq<'_, Field<T, V, NAME>, U>
+impl<T, V, U> Debug for Eq<'_, Field<T, V>, U>
 where
     U: Debug + ?Sized,
 {
@@ -224,17 +234,17 @@ where
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), FmtError> {
         let Self { field: _, value } = self;
         if f.alternate() {
-            write!(f, "{NAME} = {value:#?}")
+            write!(f, "{} = {:#?}", self.field.name, value)
         } else {
             f.debug_struct(name_of_type!(Self))
-                .field(name_of!(field in Self), &NAME)
+                .field(name_of!(field in Self), &self.field.name)
                 .field(name_of!(value in Self), value)
                 .finish()
         }
     }
 }
 
-impl<T, V, U, const NAME: &'static str> Debug for Ne<'_, Field<T, V, NAME>, U>
+impl<T, V, U> Debug for Ne<'_, Field<T, V>, U>
 where
     U: Debug + ?Sized,
 {
@@ -242,17 +252,17 @@ where
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), FmtError> {
         let Self { field: _, value } = self;
         if f.alternate() {
-            write!(f, "{NAME} != {value:#?}")
+            write!(f, "{} = {:#?}", self.field.name, value)
         } else {
             f.debug_struct(name_of_type!(Self))
-                .field(name_of!(field in Self), &NAME)
+                .field(name_of!(field in Self), &self.field.name)
                 .field(name_of!(value in Self), value)
                 .finish()
         }
     }
 }
 
-impl<T, V, U, const NAME: &'static str> Debug for Gt<'_, Field<T, V, NAME>, U>
+impl<T, V, U> Debug for Gt<'_, Field<T, V>, U>
 where
     U: Debug + ?Sized,
 {
@@ -260,17 +270,17 @@ where
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), FmtError> {
         let Self { field: _, value } = self;
         if f.alternate() {
-            write!(f, "{NAME} > {value:#?}")
+            write!(f, "{} = {:#?}", self.field.name, value)
         } else {
             f.debug_struct(name_of_type!(Self))
-                .field(name_of!(field in Self), &NAME)
+                .field(name_of!(field in Self), &self.field.name)
                 .field(name_of!(value in Self), value)
                 .finish()
         }
     }
 }
 
-impl<T, V, U, const NAME: &'static str> Debug for Lt<'_, Field<T, V, NAME>, U>
+impl<T, V, U> Debug for Lt<'_, Field<T, V>, U>
 where
     U: Debug + ?Sized,
 {
@@ -278,10 +288,10 @@ where
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), FmtError> {
         let Self { field: _, value } = self;
         if f.alternate() {
-            write!(f, "{NAME} < {value:#?}")
+            write!(f, "{} = {:#?}", self.field.name, value)
         } else {
             f.debug_struct(name_of_type!(Self))
-                .field(name_of!(field in Self), &NAME)
+                .field(name_of!(field in Self), &self.field.name)
                 .field(name_of!(value in Self), value)
                 .finish()
         }

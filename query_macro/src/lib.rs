@@ -1,56 +1,68 @@
-//! Procedural macro crate for use by [`broker::query`].
+//! Procedural macro support for the query system.
+//!
+//! This crate provides the `#[derive(Queryable)]` macro, which generates
+//! type-safe [`Field`](broker::query::Field) accessors for each named field
+//! in a struct. These accessors are used to construct queries in a fluent,
+//! compile-time checked way.
 
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{Data, DeriveInput, Type, parse_macro_input};
+use syn::{Data, DeriveInput, parse_macro_input};
 
-/// Derive macro to support queries on the type.
+/// Derive macro enabling query construction on a struct.
 ///
-/// Concretely, this creates [`Field`](broker::query::Field) constructors for all of the struct's
-/// fields for type-safe field access with metadata like field name.
+/// For each named field in the struct, this macro generates an inherent
+/// method returning a [`Field`](broker::query::Field) describing how to
+/// access that field.
+///
+/// # Example
+///
+/// ```ignore
+/// #[derive(Queryable)]
+/// struct User {
+///     id: u32,
+///     name: String,
+/// }
+///
+/// // Generated:
+/// // impl User {
+/// //     pub fn id() -> Field<User, u32> { ... }
+/// //     pub fn name() -> Field<User, String> { ... }
+/// // }
+/// ```
 ///
 /// # Panics
 ///
-/// Only structs with named fields are allowed. It is a compile-time error to use this on a tuple
-/// struct or enum type.
+/// This macro panics at compile time if:
+/// - The input type is not a struct
+/// - The struct does not have named fields
+///
+/// These constraints are required to generate valid field accessors.
 #[proc_macro_derive(Queryable)]
-#[expect(missing_inline_in_public_items, reason = "Procedural macro.")]
 pub fn derive_queryable(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     let struct_name = &input.ident;
 
-    let Data::Struct(r#struct) = input.data else {
-        panic!("Queryable can only be derived for structure types.");
+    let Data::Struct(data) = input.data else {
+        panic!("Queryable can only be derived for struct types");
     };
 
-    let field_methods = r#struct.fields.iter().map(|field| {
-        // PERF: It's not actually necessary to perform a proper check of each field, since the
-        // presence of one named field means it's a "classic" `struct` and all fields will be
-        // named.
-        let Some(field_name) = field.ident.as_ref().map(ToString::to_string) else {
-            panic!("Queryable can not be derived for tuple structs, as field names are needed.");
-        };
+    let field_methods = data.fields.iter().map(|field| {
+        let ident = field
+            .ident
+            .as_ref()
+            .expect("Queryable can only be derived for structs with named fields");
+        let name = ident.to_string();
 
-        // HACK: This does not handle qualified paths such as `std::string::String`, nor does
-        // it handle type aliases, as it works directly on the identifier as a string. Is it
-        // possible to handle this, and should the latter be handled at all? Using a type alias
-        // instead of `String` literally could be seen as an opt-out.
-        let getter = if let Type::Path(path) = &field.ty
-            && let Some(ident) = path.path.get_ident()
-            && *ident == "String"
-        {
-            quote! {
-                |data| data.#field_name.as_str()
-            }
-        } else {
-            quote! {
-                |data| &data.#field_name
-            }
-        };
+        let ty = &field.ty;
 
         quote! {
-            pub fn #field_name() -> broker::query::Field<#struct_name, _, #field_name> {
-                broker::query::Field::new(#getter)
+            /// Returns a queryable handle to this field.
+            pub fn #ident() -> ::broker::query::Field<#struct_name, #ty> {
+                ::broker::query::Field::new(
+                    #name,
+                    |s: &#struct_name| -> &#ty { &s.#ident }
+                )
             }
         }
     });
@@ -60,5 +72,5 @@ pub fn derive_queryable(input: TokenStream) -> TokenStream {
             #(#field_methods)*
         }
     }
-    .into()
+        .into()
 }

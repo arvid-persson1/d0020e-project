@@ -14,6 +14,11 @@
 // TODO: Remove.
 use tokio as _;
 
+#[allow(unused_imports)]
+// Silence unused-crate-dependencies for dev-dependency `trybuild`
+#[cfg(test)]
+use trybuild as _;
+
 pub mod errors;
 
 pub mod connector;
