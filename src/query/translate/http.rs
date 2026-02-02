@@ -12,6 +12,7 @@ use super::{
     },
     Single,
 };
+use std::sync::Arc;
 use std::{collections::HashSet, fmt::Display};
 
 /// Key-value pairs ready to be serialized as HTTP parameters.
@@ -23,7 +24,7 @@ use std::{collections::HashSet, fmt::Display};
 // This is `Vec<_>` instead of `Box<[_]>` both because implementation becomes easier, but also
 // because callers may choose to add extra parameters beyond what is provided by the query API.
 // TODO: Feature flag to disable preserving order, if this would be more performant?
-pub type HttpQuery = Vec<(&'static str, Box<str>)>;
+pub type HttpQuery = Vec<(Arc<str>, Box<str>)>;
 
 /// Translate queries into HTTP format (HTTP query parameters) for use with
 /// [REST connectors](crate::rest).
@@ -75,7 +76,7 @@ where
     fn to_http_single(&self) -> Single<'_, HttpQuery, T> {
         let Self { field: _, value } = self;
         Single {
-            query: vec![(self.field.name, value.to_string().into())],
+            query: vec![(Arc::clone(&self.field.name), value.to_string().into())],
             residue: Vec::new(),
         }
     }
@@ -85,7 +86,7 @@ where
     #[inline]
     fn to_http_multi(&self) -> Option<Vec<HttpQuery>> {
         let Self { field: _, value } = self;
-        let query = vec![(self.field.name, value.to_string().into())];
+        let query = vec![(Arc::clone(&self.field.name), value.to_string().into())];
         Some(vec![query])
     }
 }

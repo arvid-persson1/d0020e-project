@@ -61,7 +61,7 @@ pub fn derive_queryable(input: TokenStream) -> TokenStream {
             /// Returns a queryable handle to this field.
             pub fn #ident() -> ::broker::query::Field<#struct_name, #ty> {
                 ::broker::query::Field::new(
-                    #name,
+                    ::std::sync::Arc::<str>::from(#name),
                     |s: &#struct_name| -> &#ty { &s.#ident }
                 )
             }

@@ -9,10 +9,9 @@
   <component name="ChangeListManager">
     <list default="true" id="07956dfa-53d7-48c6-a58a-7bce9a9345a5" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/query_macro/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/query_macro/Cargo.toml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/query_macro/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/query_macro/src/lib.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/lib.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/tests/compile.rs" beforeDir="false" afterPath="$PROJECT_DIR$/tests/compile.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/query.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/query.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/query/translate/http.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/query/translate/http.rs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -157,7 +156,8 @@
       <workItem from="1769419879327" duration="14860000" />
       <workItem from="1769516465163" duration="9904000" />
       <workItem from="1769607619799" duration="13609000" />
-      <workItem from="1769779726943" duration="5345000" />
+      <workItem from="1769779726943" duration="12579000" />
+      <workItem from="1770025505793" duration="1847000" />
     </task>
     <servers />
   </component>

@@ -20,12 +20,6 @@ mod translate;
 pub use crate::query::translate::ToHttp;
 pub use translate::*;
 
-/// Concatenate two field-name segments into a dotted path.
-/// Example: "address" + "city" -> "address.city"
-fn concat_names(a: &'static str, b: &'static str) -> &'static str {
-    Box::leak(format!("{a}.{b}").into_boxed_str())
-}
-
 /// A typed handle to a struct field.
 ///
 /// A `Field<T, U>` represents:
@@ -36,7 +30,7 @@ fn concat_names(a: &'static str, b: &'static str) -> &'static str {
 #[derive(Clone)]
 pub struct Field<T: ?Sized, U: ?Sized> {
     /// Field name (used for debug / translation)
-    pub name: &'static str,
+    pub name: Arc<str>,
     /// Getter function
     pub getter: Arc<dyn for<'b> Fn(&'b T) -> &'b U + Send + Sync>,
 }
@@ -53,9 +47,12 @@ impl<T: ?Sized, U: ?Sized> fmt::Debug for Field<T, U> {
 impl<T: ?Sized + 'static, U: ?Sized + 'static> Field<T, U> {
     /// Construct a new Field from a name and getter function.
     #[inline]
-    pub fn new(name: &'static str, getter: impl Fn(&T) -> &U + Send + Sync + 'static) -> Self {
+    pub fn new(
+        name: impl Into<Arc<str>>,
+        getter: impl Fn(&T) -> &U + Send + Sync + 'static,
+    ) -> Self {
         Self {
-            name,
+            name: name.into(),
             getter: Arc::new(getter),
         }
     }
@@ -67,7 +64,7 @@ impl<T: ?Sized + 'static, U: ?Sized + 'static> Field<T, U> {
     #[must_use]
     #[inline]
     pub fn then<V: ?Sized + 'static>(self, next: &Field<U, V>) -> Field<T, V> {
-        let name = concat_names(self.name, next.name);
+        let name = Arc::<str>::from(format!("{}.{}", self.name, next.name));
         let g1 = Arc::clone(&self.getter);
         let g2 = Arc::clone(&next.getter);
 
