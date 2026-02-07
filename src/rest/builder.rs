@@ -62,14 +62,14 @@ pub struct Builder<
     /// The [`Client`] to use when making requests.
     // INVARIANT: `client.is_some() == CLIENT`.
     client: Option<Client>,
-    /// The [encoder](Encode) to use when sending data.
+    /// The [encoder](crate::Encode) to use when sending data.
     // INVARIANT: `encoder.is_some() == ENCODER`.
     encoder: Option<E>,
-    /// The [decoder](Decode) to use when fetching data.
+    /// The [decoder](crate::Decode) to use when fetching data.
     // INVARIANT: `decoder.is_some() == DECODER`.
     decoder: Option<D>,
-    /// The combined [encoder](Encode) and [decoder](Decode) to use when sending and fetching data
-    /// respestively.
+    /// The combined [encoder](crate::Encode) and [decoder](crate::Decode) to use when sending and
+    /// fetching data respestively.
     // INVARIANT: `combined.is_some() == COMBINED`.
     // INVARIANT: `!(combined.is_some() && encoder.is_some())`.
     // INVARIANT: `!(combined.is_some() && decoder.is_some())`.

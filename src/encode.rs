@@ -18,9 +18,6 @@ pub mod json;
 /// example, it may be the case that several elements encoded and then concatenated are not
 /// equivalent to those same elements concatenated then encoded (e.g. JSON, where objects "in
 /// sequence" are not equivalent to a list of objects).
-///
-/// An encoder is generally stateless, e.g. one for JSON, meaning they will practically often be
-/// ZSTs.
 // TODO: Add support for formatters, allowing things like "pretty printing".
 #[expect(
     clippy::missing_errors_doc,
@@ -65,14 +62,10 @@ pub trait Encode<T> {
 /// A type that can decode data from bytes.
 ///
 /// This trait provides several ways of decoding data regarding how many bytes are returned at a
-/// time. The [`decode`](Self::decode) method is `async` to work with data that is produced in
-/// real time while the others expect all bytes in advance. It it also conservative and tries to
-/// make no assumptions about the data format: for example, it may be the case that several
-/// elements encoded and then concatenated are not equivalent to those same elements concatenated
-/// then encoded (e.g. JSON, where objects "in sequence" are not equivalent to a list of objects).
-///
-/// A decoder is generally stateless, e.g. one for JSON, meaning they will practically often be
-/// ZSTs.
+/// time. It it also conservative and tries to make no assumptions about the data format: for
+/// example, it may be the case that several elements encoded and then concatenated are not
+/// equivalent to those same elements concatenated then encoded (e.g. JSON, where objects "in
+/// sequence" are not equivalent to a list of objects).
 #[expect(
     clippy::missing_errors_doc,
     reason = "Default implementations only delegate errors and do not raise their own."
@@ -84,6 +77,7 @@ pub trait Decode<T> {
     /// [`DecodeStreamError::Connection`] should only passed on from input; decoding should not
     /// produce new connection errors, though this is not enforced or validated.
     // TODO: Can this be simplified using `tokio::io::AsyncRead`?
+    // TODO: Feature gate or get rid of `bytes` dependency.
     #[inline]
     fn decode<S>(
         &self,
@@ -123,7 +117,7 @@ pub trait Decode<T> {
     /// Decode a single entry from a slice. If the slice is empty or represents an empty
     /// collection, <code>[Err]\([`Empty`](DecodeOneError::Empty))</code> is returned.
     ///
-    /// One entry is assumed to be fairly small such that collection all bytes into a slice is
+    /// One entry is assumed to be fairly small such that collecting all bytes into a slice is
     /// acceptable, and as such no stream variant of this method exists.
     #[inline]
     fn decode_one(&self, bytes: &[u8]) -> Result<T, DecodeOneError> {
@@ -137,7 +131,7 @@ pub trait Decode<T> {
     /// This method poses no restriction on *which* entry should be returned. The format may
     /// however define an ordering.
     ///
-    /// One entry is assumed to be fairly small such that collection all bytes into a slice is
+    /// One entry is assumed to be fairly small such that collecting all bytes into a slice is
     /// acceptable, and as such no stream variant of this method exists.
     fn decode_optional(&self, bytes: &[u8]) -> Result<Option<T>, DecodeError>;
 }
@@ -149,6 +143,8 @@ pub struct Codec<T, E = (), D = (), C = ()>(CodecImpl<T, E, D, C>);
 /// Implementation of [`Codec`].
 // TODO: `PhantomData` usage here may be overly restrictive when considering variance. Improve
 // using unstable `phantom_variance_markers` (#135806)?
+// TODO: Eliminate a type parameter by reusing `E` or `D` for `Combined`, or forcing type equality?
+// TODO: Move `PhantomData` to `Codec`?
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 enum CodecImpl<T, E, D, C> {
     /// Separate encoder and decoder.

@@ -52,6 +52,7 @@ incremental = false
 panic = "abort"
 
 [dependencies]
+async-trait = { version = "0.1.89", default-features = false }
 bytes = "1.11.0"
 futures = "0.3.31"
 reqwest = { features = ["stream"], version = "0.12.24" }
