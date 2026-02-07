@@ -63,12 +63,14 @@ pub(crate) async fn get_book(
             }
         })?;
 
+    println!("--> HANDLER: get_book was called!");
+
     Ok(Json(res))
 }
 /// Builder function for the Router app.
 pub(crate) fn build_app(pool: DbPool) -> Router {
     Router::<DbPool>::new()
         .route("/books", get(get_books_list))
-        .route("/books/:isbn", get(get_book))
+        .route("/books/{isbn}", get(get_book))
         .with_state(pool)
 }
