@@ -1,8 +1,8 @@
-use serde::Serialize;
-use diesel::prelude::*;
-use diesel::pg::Pg;
-use diesel_derive_enum::DbEnum;
 use crate::schema::books;
+use diesel::pg::Pg;
+use diesel::prelude::*;
+use diesel_derive_enum::DbEnum;
+use serde::Serialize;
 
 #[derive(DbEnum, Debug, PartialEq, Serialize)]
 #[ExistingTypePath = "crate::schema::sql_types::BookFormatType"]
