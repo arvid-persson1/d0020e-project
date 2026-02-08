@@ -5,12 +5,11 @@ use crate::{
     connector::{Sink, Source},
     encode::{Codec, Decode, Encode},
     errors::{ConnectionError, DecodeError, FetchError, FetchOneError, SendError},
-    query::translate,
+    query::{HttpQuery, Single},
 };
 use async_trait::async_trait;
-use futures::{StreamExt as _, stream::BoxStream};
+use futures::{StreamExt as _, TryStreamExt as _, future::ready, stream::BoxStream};
 use reqwest::{Body, Client, Method, Response, Url};
-use serde::Serialize;
 use std::{io::Error as IoError, marker::PhantomData};
 
 /// The [`Builder`], used to construct REST connectors more flexibly.
@@ -96,7 +95,7 @@ async fn fetch_impl(
     client: &Client,
     url: Url,
     method: Method,
-    query: impl Serialize,
+    query: HttpQuery<'_>,
 ) -> Result<Response, FetchError> {
     // `RequestBuilder::build` also fails is the URL cannot be parsed. Although
     // `<Url as IntoUrl>::into_url` can fail, it has already been validated that this will not
@@ -136,6 +135,11 @@ where
     client.execute(request).await.map_err(Into::into)
 }
 
+// TODO: Add support for query translation strategies. Currently uses only `to_http_single`, and
+// allows all residue.
+
+// TODO: Reduce code repetition.
+
 #[async_trait]
 impl<T, Q, D> Source<T> for ReadOnly<T, Q, D>
 where
@@ -146,70 +150,82 @@ where
     #[inline]
     async fn fetch<'s>(
         &'s mut self,
-        query: &(dyn Query<T> + Sync),
+        query: &'s (dyn Query<T> + Sync),
     ) -> Result<BoxStream<'s, Result<T, FetchError>>, FetchError>
     where
         T: 's,
     {
-        let translated = translate(query);
+        let Single { query, residue } = query.to_http_single();
 
-        let bytes = fetch_impl(
-            &self.client,
-            self.url.clone(),
-            self.method.clone(),
-            translated,
-        )
-        .await?
-        .bytes_stream()
-        .map(|res| {
-            res.map_err(|err| {
+        let bytes = fetch_impl(&self.client, self.url.clone(), self.method.clone(), query)
+            .await?
+            .bytes_stream()
+            .map_err(|err| {
                 // HTTP errors should be raised by `fetch_impl`, and already have been returned.
                 debug_assert!(err.status().is_none());
                 ConnectionError::Io(IoError::other(err))
+            });
+
+        let apply_residue = move |res| {
+            ready(match res {
+                Ok(entry) if residue.iter().all(|part| part.evaluate(&entry)) => Some(Ok(entry)),
+                Ok(_) => None,
+                Err(err) => Some(Err(FetchError::from(err))),
             })
-        });
+        };
 
         self.decoder
             .decode(bytes)
             .await
-            .map(|output| output.map(|res| res.map_err(Into::into)).boxed())
+            .map(|output| output.filter_map(apply_residue).boxed())
             .map_err(Into::into)
     }
 
     #[inline]
     async fn fetch_all(&mut self, query: &(dyn Query<T> + Sync)) -> Result<Vec<T>, FetchError> {
-        let translated = translate(query);
+        let Single { query, residue } = query.to_http_single();
 
-        let bytes = fetch_impl(
-            &self.client,
-            self.url.clone(),
-            self.method.clone(),
-            translated,
-        )
-        .await?
-        .bytes()
-        .await?;
+        let bytes = fetch_impl(&self.client, self.url.clone(), self.method.clone(), query)
+            .await?
+            .bytes()
+            .await?;
 
         self.decoder
             .decode_all(&bytes)
+            .map(|mut entries| {
+                entries.retain(|entry| residue.iter().all(|part| part.evaluate(entry)));
+                entries
+            })
             .map_err(|err| DecodeError(Box::new(err)).into())
     }
 
     #[inline]
     async fn fetch_one(&mut self, query: &(dyn Query<T> + Sync)) -> Result<T, FetchOneError> {
-        let translated = translate(query);
+        let Single { query, residue } = query.to_http_single();
 
-        let bytes = fetch_impl(
-            &self.client,
-            self.url.clone(),
-            self.method.clone(),
-            translated,
-        )
-        .await?
-        .bytes()
-        .await?;
+        let bytes = fetch_impl(&self.client, self.url.clone(), self.method.clone(), query)
+            .await?
+            .bytes_stream()
+            .map_err(|err| {
+                // HTTP errors should be raised by `fetch_impl`, and already have been returned.
+                debug_assert!(err.status().is_none());
+                ConnectionError::Io(IoError::other(err))
+            });
 
-        self.decoder.decode_one(&bytes).map_err(Into::into)
+        // TODO: Fix this messy code.
+
+        let mut error = None;
+
+        let mut stream = self.decoder.decode(bytes).await?;
+        while let Some(result) = stream.next().await {
+            match result {
+                Ok(entry) if residue.iter().all(|part| part.evaluate(&entry)) => return Ok(entry),
+                Ok(_) => {},
+                Err(err) => error = Some(err),
+            }
+        }
+
+        Err(error.map_or(FetchOneError::NoSuchEntry, Into::into))
     }
 }
 
@@ -225,45 +241,51 @@ where
     #[inline]
     async fn fetch<'s>(
         &'s mut self,
-        query: &(dyn Query<T> + Sync),
+        query: &'s (dyn Query<T> + Sync),
     ) -> Result<BoxStream<'s, Result<T, FetchError>>, FetchError>
     where
         T: 's,
     {
-        let translated = translate(query);
+        let Single { query, residue } = query.to_http_single();
 
         let bytes = fetch_impl(
             &self.client,
             self.source_url.clone(),
             self.source_method.clone(),
-            translated,
+            query,
         )
         .await?
         .bytes_stream()
-        .map(|res| {
-            res.map_err(|err| {
-                // HTTP errors should be raised by `fetch_impl`, and already have been returned.
-                debug_assert!(err.status().is_none());
-                ConnectionError::Io(IoError::other(err))
-            })
+        .map_err(|err| {
+            // HTTP errors should be raised by `fetch_impl`, and already have been returned.
+            debug_assert!(err.status().is_none());
+            ConnectionError::Io(IoError::other(err))
         });
+
+        let apply_residue = move |res| {
+            ready(match res {
+                Ok(entry) if residue.iter().all(|part| part.evaluate(&entry)) => Some(Ok(entry)),
+                Ok(_) => None,
+                Err(err) => Some(Err(FetchError::from(err))),
+            })
+        };
 
         self.codec
             .decode(bytes)
             .await
-            .map(|output| output.map(|res| res.map_err(Into::into)).boxed())
+            .map(|output| output.filter_map(apply_residue).boxed())
             .map_err(Into::into)
     }
 
     #[inline]
     async fn fetch_all(&mut self, query: &(dyn Query<T> + Sync)) -> Result<Vec<T>, FetchError> {
-        let translated = translate(query);
+        let Single { query, residue } = query.to_http_single();
 
         let bytes = fetch_impl(
             &self.client,
             self.source_url.clone(),
             self.source_method.clone(),
-            translated,
+            query,
         )
         .await?
         .bytes()
@@ -271,24 +293,45 @@ where
 
         self.codec
             .decode_all(&bytes)
+            .map(|mut entries| {
+                entries.retain(|entry| residue.iter().all(|part| part.evaluate(entry)));
+                entries
+            })
             .map_err(|err| DecodeError(Box::new(err)).into())
     }
 
     #[inline]
     async fn fetch_one(&mut self, query: &(dyn Query<T> + Sync)) -> Result<T, FetchOneError> {
-        let translated = translate(query);
+        let Single { query, residue } = query.to_http_single();
 
         let bytes = fetch_impl(
             &self.client,
             self.source_url.clone(),
             self.source_method.clone(),
-            translated,
+            query,
         )
         .await?
-        .bytes()
-        .await?;
+        .bytes_stream()
+        .map_err(|err| {
+            // HTTP errors should be raised by `fetch_impl`, and already have been returned.
+            debug_assert!(err.status().is_none());
+            ConnectionError::Io(IoError::other(err))
+        });
 
-        self.codec.decode_one(&bytes).map_err(Into::into)
+        // TODO: Fix this messy code.
+
+        let mut error = None;
+
+        let mut stream = self.codec.decode(bytes).await?;
+        while let Some(result) = stream.next().await {
+            match result {
+                Ok(entry) if residue.iter().all(|part| part.evaluate(&entry)) => return Ok(entry),
+                Ok(_) => {},
+                Err(err) => error = Some(err),
+            }
+        }
+
+        Err(error.map_or(FetchOneError::NoSuchEntry, Into::into))
     }
 }
 
@@ -375,7 +418,6 @@ where
 )]
 #[allow(clippy::unwrap_used, reason = "Panics simply indicate failed tests.")]
 mod tests {
-    /*
     use super::*;
     use crate::encode::json::Json;
     use serde::{Deserialize, Serialize};
@@ -401,5 +443,4 @@ mod tests {
 
         let _cat: Cat = rest.fetch_one([("json", "true")]).await.unwrap();
     }
-    */
 }

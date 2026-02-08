@@ -3,9 +3,7 @@
 use crate::errors::{ConnectionError, DecodeError, DecodeOneError, DecodeStreamError, EncodeError};
 use bytes::{Bytes, BytesMut};
 use futures::{
-    Stream, TryFutureExt as _, TryStreamExt as _,
-    future::{Either, ready},
-    stream::iter as from_iter,
+    Stream, TryFutureExt as _, TryStreamExt as _, future::Either, stream::iter as from_iter,
 };
 use std::marker::PhantomData;
 
@@ -73,9 +71,7 @@ pub trait Encode<T> {
 pub trait Decode<T> {
     /// Decode data from a stream of bytes.
     ///
-    /// An error may be raised for each item produced, or before any are. Reasonably,
-    /// [`DecodeStreamError::Connection`] should only passed on from input; decoding should not
-    /// produce new connection errors, though this is not enforced or validated.
+    /// An error may be raised for each item produced, or before any are.
     // TODO: Can this be simplified using `tokio::io::AsyncRead`?
     // TODO: Feature gate or get rid of `bytes` dependency.
     #[inline]
@@ -84,7 +80,7 @@ pub trait Decode<T> {
         bytes: S,
     ) -> impl Future<
         Output = Result<
-            impl Stream<Item = Result<T, DecodeStreamError>> + Send + Unpin,
+            impl Stream<Item = Result<T, DecodeError>> + Send + Unpin,
             DecodeStreamError,
         >,
     > + Send
@@ -96,12 +92,10 @@ pub trait Decode<T> {
         bytes
             .try_collect::<BytesMut>()
             .map_err(Into::into)
-            .and_then(|buf| {
-                let res = self
-                    .decode_all(&buf)
+            .and_then(move |buf| async move {
+                self.decode_all(&buf)
                     .map(|vec| from_iter(vec.into_iter().map(Ok)))
-                    .map_err(DecodeStreamError::Decode);
-                ready(res)
+                    .map_err(DecodeStreamError::Decode)
             })
     }
 
@@ -220,7 +214,7 @@ where
     async fn decode<S>(
         &self,
         bytes: S,
-    ) -> Result<impl Stream<Item = Result<T, DecodeStreamError>> + Send + Unpin, DecodeStreamError>
+    ) -> Result<impl Stream<Item = Result<T, DecodeError>> + Send + Unpin, DecodeStreamError>
     where
         Self: Sync,
         T: Send,

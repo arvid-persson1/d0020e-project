@@ -1,5 +1,5 @@
-#![feature(never_type)]
 #![feature(type_changing_struct_update)]
+#![feature(never_type)]
 
 //! The data broker.
 
@@ -9,14 +9,11 @@
 // it a test-only dependency for the time being, this is added temporarily to suppress warnings.
 // TODO: Remove.
 use async_trait::async_trait;
-use bytes as _;
 use futures::{
     StreamExt as _,
     future::try_join_all,
     stream::{BoxStream, FuturesUnordered, select_all},
 };
-use serde as _;
-use serde_json as _;
 use tokio as _;
 
 pub mod errors;
@@ -25,11 +22,12 @@ use crate::errors::{FetchError, FetchOneError};
 pub mod connector;
 
 pub mod query;
-use query::Query;
+pub use query::Query;
 
 pub mod encode;
 pub use encode::{Codec, Decode, Encode};
 
+#[cfg(feature = "rest")]
 pub mod rest;
 
 use connector::Source;
@@ -92,7 +90,7 @@ where
     #[inline]
     async fn fetch<'s>(
         &'s mut self,
-        query: &(dyn Query<T> + Sync),
+        query: &'s (dyn Query<T> + Sync),
     ) -> Result<BoxStream<'s, Result<T, FetchError>>, FetchError>
     where
         T: 's,
@@ -140,7 +138,7 @@ where
 
         // TODO: Fix this messy code.
 
-        let mut first_error = None;
+        let mut error = None;
 
         while let Some(result) = futures.next().await {
             match result {
@@ -150,12 +148,12 @@ where
                 // one is just temporarily down. Due to the API, we can't return all errors, so
                 // we arbitrarily return the first in the case that all sources fail.
                 Err(FetchOneError::Fetch(err)) => {
-                    first_error = Some(err);
+                    error = Some(err);
                 },
             }
         }
 
-        Err(first_error.map_or(FetchOneError::NoSuchEntry, FetchOneError::Fetch))
+        Err(error.map_or(FetchOneError::NoSuchEntry, FetchOneError::Fetch))
     }
 
     #[inline]
@@ -171,7 +169,7 @@ where
 
         // TODO: Fix this messy code.
 
-        let mut first_error = None;
+        let mut error = None;
 
         while let Some(result) = futures.next().await {
             match result {
@@ -181,12 +179,12 @@ where
                 // one is just temporarily down. Due to the API, we can't return all errors, so
                 // we arbitrarily return the first in the case that all sources fail.
                 Err(err) => {
-                    first_error = Some(err);
+                    error = Some(err);
                 },
             }
         }
 
-        first_error.map_or_else(|| Ok(None), Err)
+        error.map_or_else(|| Ok(None), Err)
     }
 
     #[inline]

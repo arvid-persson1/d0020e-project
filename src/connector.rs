@@ -27,7 +27,7 @@ where
     #[inline]
     async fn fetch<'s>(
         &'s mut self,
-        query: &(dyn Query<T> + Sync),
+        query: &'s (dyn Query<T> + Sync),
     ) -> Result<BoxStream<'s, Result<T, FetchError>>, FetchError>
     where
         T: 's,
