@@ -106,6 +106,8 @@ async fn books_test() {
 
     assert_eq!(response404.status(), StatusCode::NOT_FOUND);
 
+    // Test 4: Empty list scenario
+
     // Manually clears the database contents.
     {
         let mut conn = pool.get().expect("Failed to get connection");
