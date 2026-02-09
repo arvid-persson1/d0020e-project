@@ -410,37 +410,3 @@ where
         .map_err(Into::into)
     }
 }
-
-#[cfg(test)]
-#[allow(
-    clippy::missing_panics_doc,
-    reason = "Panics simply indicate failed tests."
-)]
-#[allow(clippy::unwrap_used, reason = "Panics simply indicate failed tests.")]
-mod tests {
-    use super::*;
-    use crate::encode::json::Json;
-    use serde::{Deserialize, Serialize};
-
-    #[tokio::test]
-    async fn cat_aas() {
-        #[derive(Clone, Debug, Serialize, Deserialize)]
-        struct Cat {
-            id: String,
-            tags: Vec<String>,
-            created_at: String,
-            url: String,
-            mimetype: String,
-        }
-
-        // Endpoint: `https://cataas.com/cat?json=true`.
-
-        let mut rest = Builder::new()
-            .source_url("https://cataas.com/cat")
-            .unwrap()
-            .decoder(Json)
-            .build();
-
-        let _cat: Cat = rest.fetch_one([("json", "true")]).await.unwrap();
-    }
-}

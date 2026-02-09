@@ -1,0 +1,20 @@
+[package]
+name = "bookery"
+categories.workspace = true
+description.workspace = true
+edition.workspace = true
+keywords.workspace = true
+license.workspace = true
+readme.workspace = true
+repository.workspace = true
+version.workspace = true
+
+[dependencies]
+actix-web = "4.12.1"
+serde = { version = "1", features = ["derive"] }
+uuid = { version = "1", features = ["serde", "v4"] }
+parking_lot = "0.12.5"
+
+
+[lints]
+workspace = true
