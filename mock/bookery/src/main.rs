@@ -89,11 +89,7 @@ struct BookSearch {
 ///
 /// # Panics
 /// Panics if acquiring the books mutex fails.
-async fn get_books(
-    query: web::Query<BookSearch>,
-    data: web::Data<AppState>,
-) -> impl Responder {
-
+async fn get_books(query: web::Query<BookSearch>, data: web::Data<AppState>) -> impl Responder {
     let results: Vec<Book> = {
         let books = data.books.lock();
 
@@ -166,7 +162,6 @@ async fn main() -> Result<()> {
             },
         ]),
     });
-
 
     println!("Bookstore API running at http://localhost:8080");
 
