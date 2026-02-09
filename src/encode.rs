@@ -8,6 +8,7 @@ use futures::{
 use std::marker::PhantomData;
 
 pub mod json;
+pub mod xml;
 
 /// A type that can encode data as bytes.
 ///
