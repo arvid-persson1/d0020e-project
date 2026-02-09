@@ -19,6 +19,9 @@ workspace = true
 members = ["demo", "mock/bookery", "mock/graphql-api", "mock/rest-api-axum", "query_macro"]
 resolver = "3"
 
+[workspace.dependencies]
+broker = { path = "." }
+
 [workspace.package]
 categories = ["api-bindings", "database"]
 description = "\"Product Data Broker\" for the D0020E \"Project in computer science\" course at Luleå University of Technology"

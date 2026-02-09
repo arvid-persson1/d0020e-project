@@ -24,7 +24,7 @@ pub use builder::*;
 /// Note that the type `(&str, &str)` and some similar types **cannot** be serialized to query
 /// parameters, but alternatives like `&[(&str, &str)]` can.
 #[derive(Debug, Clone)]
-pub struct ReadOnly<T, Q, D> {
+pub struct ReadOnly<T, D> {
     /// The URL to fetch data from.
     url: Url,
     /// The HTTP method to use when fetching data.
@@ -33,10 +33,10 @@ pub struct ReadOnly<T, Q, D> {
     client: Client,
     /// The decoder used to deserialize received data.
     decoder: D,
-    /// Satisfies missing fields using `T` and `Q`.
+    /// Satisfies missing fields using `T`.
     // TODO: This may be overly restrictive when considering variance. Improve using unstable
     // `phantom_variance_markers` (#135806)?
-    _phantom: PhantomData<(T, Q)>,
+    _phantom: PhantomData<T>,
 }
 
 /// A sink to work with REST APIs.
@@ -53,7 +53,7 @@ pub struct WriteOnly<T, E> {
     client: Client,
     /// The encoder used to serialize data to be sent.
     encoder: E,
-    /// Satisfies missing fields using `T` and `Q`.
+    /// Satisfies missing fields using `T`.
     // TODO: This may be overly restrictive when considering variance. Improve using unstable
     // `phantom_variance_markers` (#135806)?
     _phantom: PhantomData<T>,
@@ -67,7 +67,7 @@ pub struct WriteOnly<T, E> {
 /// Note that the type `(&str, &str)` and some similar types **cannot** be serialized to query
 /// parameters, but an array or a slice like `&[(&str, &str)]` can.
 #[derive(Debug, Clone)]
-pub struct ReadWrite<T, Q, E, D, C> {
+pub struct ReadWrite<T, E, D, C> {
     /// The URL to fetch data from.
     source_url: Url,
     /// The HTTP method to use when fetching data.
@@ -80,10 +80,10 @@ pub struct ReadWrite<T, Q, E, D, C> {
     client: Client,
     /// The codec used to serialize and deserialize data.
     codec: Codec<T, E, D, C>,
-    /// Satisfies missing fields using `T` and `Q`.
+    /// Satisfies missing fields using `T`.
     // TODO: This may be overly restrictive when considering variance. Improve using unstable
     // `phantom_variance_markers` (#135806)?
-    _phantom: PhantomData<(T, Q)>,
+    _phantom: PhantomData<T>,
 }
 
 /// Helper to use for [`Source`] implementation.
@@ -141,10 +141,9 @@ where
 // TODO: Reduce code repetition.
 
 #[async_trait]
-impl<T, Q, D> Source<T> for ReadOnly<T, Q, D>
+impl<T, D> Source<T> for ReadOnly<T, D>
 where
     T: Send,
-    Q: Send,
     D: Decode<T> + Send + Sync,
 {
     #[inline]
@@ -185,10 +184,8 @@ where
     async fn fetch_all(&mut self, query: &(dyn Query<T> + Sync)) -> Result<Vec<T>, FetchError> {
         let Single { query, residue } = query.to_http_single();
 
-        let bytes = fetch_impl(&self.client, self.url.clone(), self.method.clone(), query)
-            .await?
-            .bytes()
-            .await?;
+        let bytes = fetch_impl(&self.client, self.url.clone(), self.method.clone(), query).await?;
+        let bytes = bytes.bytes().await?;
 
         self.decoder
             .decode_all(&bytes)
@@ -230,10 +227,9 @@ where
 }
 
 #[async_trait]
-impl<T, Q, E, D, C> Source<T> for ReadWrite<T, Q, E, D, C>
+impl<T, E, D, C> Source<T> for ReadWrite<T, E, D, C>
 where
     T: Send + Sync,
-    Q: Send,
     E: Send + Sync,
     D: Decode<T> + Send + Sync,
     C: Decode<T> + Send + Sync,
@@ -374,10 +370,9 @@ where
 }
 
 #[async_trait]
-impl<T, Q, E, D, C> Sink<T> for ReadWrite<T, Q, E, D, C>
+impl<T, E, D, C> Sink<T> for ReadWrite<T, E, D, C>
 where
     T: Sync,
-    Q: Sync,
     E: Encode<T> + Sync,
     D: Sync,
     C: Encode<T> + Sync,

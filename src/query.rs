@@ -77,6 +77,17 @@ pub struct Field<T: ?Sized, U: ?Sized> {
     getter: Arc<dyn for<'b> Fn(&'b T) -> &'b U + Send + Sync>,
 }
 
+impl<T: ?Sized, U: ?Sized> Field<T, U> {
+    /// Constructs a `Field`  from a field name and associated getter function.
+    #[inline]
+    pub fn new(name: Arc<str>, getter: impl Fn(&T) -> &U + Send + Sync + 'static) -> Self {
+        Self {
+            name,
+            getter: Arc::new(getter),
+        }
+    }
+}
+
 impl<T: ?Sized, U: ?Sized> fmt::Debug for Field<T, U> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

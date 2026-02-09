@@ -44,6 +44,13 @@ impl<T> Broker<T>
 where
     T: Send,
 {
+    /// Constructs a broker with no sources.
+    pub fn new() -> Self {
+        Self {
+            sources: Vec::new(),
+        }
+    }
+
     /// Add a source to the broker.
     #[inline]
     pub fn add_source(&mut self, source: Box<dyn Source<T> + Send>) {
