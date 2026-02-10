@@ -1,8 +1,4 @@
-use axum::{
-    extract::{Path, State},
-    http::StatusCode,
-    response::IntoResponse,
-};
+use axum::{extract::Query, extract::State, http::StatusCode, response::IntoResponse};
 
 use serde::{Deserialize, Serialize};
 
@@ -10,7 +6,7 @@ use axum_serde::Xml;
 
 use std::sync::{Arc, Mutex};
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 /// Type for the supported book formats
 enum BookFormatType {
     /// Format for PDF
@@ -23,6 +19,14 @@ enum BookFormatType {
     Hardcover,
     /// Format for Paperback
     Paperback,
+}
+
+#[derive(Deserialize)]
+pub(crate) struct BookSearch {
+    isbn: Option<String>,
+    title: Option<String>,
+    author: Option<String>,
+    format: Option<BookFormatType>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -98,8 +102,8 @@ pub(crate) async fn get_books(
 #[inline]
 pub(crate) async fn get_book(
     State(state): State<Arc<AppState>>,
-    Path(isbn): Path<String>,
-) -> impl IntoResponse {
+    Query(params): Query<BookSearch>,
+) -> Result<impl IntoResponse, StatusCode> {
     let book_option = {
         // If the lock fails, this returns Err(500) immediately.
         let books_guard = state
@@ -107,7 +111,18 @@ pub(crate) async fn get_book(
             .lock()
             .map_err(|_err| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-        books_guard.iter().find(|b| b.isbn == isbn).cloned()
+        books_guard
+            .iter()
+            .find(|book| {
+                let matches_isbn = params.isbn.as_ref().is_none_or(|q| q == &book.isbn);
+                let matches_author = params.author.as_ref().is_none_or(|q| q == &book.author);
+                let matches_title = params.title.as_ref().is_none_or(|q| q == &book.title);
+                let matches_format = params.format.as_ref().is_none_or(|q| q == &book.format);
+
+                // A book is a "match" only if ALL provided criteria are true
+                matches_isbn && matches_author && matches_title && matches_format
+            })
+            .cloned()
     };
 
     book_option.map_or(

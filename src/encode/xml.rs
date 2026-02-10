@@ -103,11 +103,12 @@ where
 }
 
 #[cfg(test)]
+#[allow(clippy::missing_panics_doc, reason = "Panics when tests fail")]
+#[allow(clippy::unwrap_used, reason = "Panics when tests fail")]
 mod tests {
-    use std::vec;
-
     use super::*;
     use serde::{Deserialize, Serialize};
+    use std::vec;
 
     #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
     #[serde(rename = "TestData")]
@@ -168,7 +169,7 @@ mod tests {
 
         let encoded_vec = encoder.encode_all(&data).unwrap();
         let encoded_iter = encoder.encode(data.iter()).unwrap();
-        let encoded_all = encoder.encode(data.clone().iter()).unwrap();
+        let encoded_all = encoder.encode(data.iter()).unwrap();
 
         assert_eq!(encoded_vec, encoded_iter);
         assert_eq!(encoded_vec, encoded_all);
@@ -188,9 +189,10 @@ mod tests {
 
     #[test]
     fn decode_one_empty() {
+        use crate::errors::DecodeOneError;
         let decoder = Xml;
         let res: Result<TestData, _> = decoder.decode_one(&[]);
-        assert!(res.is_err());
+        assert!(matches!(res.unwrap_err(), DecodeOneError::Empty));
     }
 
     #[test]
