@@ -95,6 +95,7 @@ impl<T> Default for Broker<T>
 where
     T: Send,
 {
+    #[inline]
     fn default() -> Self {
         Self::new()
     }
