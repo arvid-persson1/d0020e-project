@@ -20,6 +20,8 @@ enum BookFormatType {
     Hardcover,
     /// Paperback printed out format
     Paperback,
+    /// Pocket edition
+    Pocket,
 }
 
 /// ISBN identifier
@@ -159,6 +161,27 @@ async fn main() -> Result<()> {
                 author: "Herman Melville".to_string(),
                 format: BookFormatType::Hardcover,
                 isbn: Isbn("9781503280786".to_string()),
+            },
+            Book {
+                id: Uuid::new_v4(),
+                title: "1984".to_string(),
+                author: "George Orwell".to_string(),
+                format: BookFormatType::Paperback,
+                isbn: Isbn("9780141036144".to_string()),
+            },
+            Book {
+                id: Uuid::new_v4(),
+                title: "Animal Farm".to_string(),
+                author: "George Orwell".to_string(),
+                format: BookFormatType::Paperback,
+                isbn: Isbn("9780141036137".to_string()),
+            },
+            Book {
+                id: Uuid::new_v4(),
+                title: "1984".to_string(),
+                author: "George Orwell".to_string(),
+                format: BookFormatType::Pocket,
+                isbn: Isbn("9789173539678".to_string()),
             },
         ]),
     });

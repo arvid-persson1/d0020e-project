@@ -15,7 +15,6 @@ use serde::Deserialize;
 use std::fmt::{Display, Error as FmtError, Formatter};
 use tokio::main;
 
-/// Building book
 #[derive(Deserialize, Debug, Queryable)]
 struct Book {
     title: String,
@@ -41,7 +40,7 @@ async fn main() {
 
     broker.add_source(Box::new(
         RestBuilder::new()
-            .source_url("http://127.0.0.1:8080")
+            .source_url("http://127.0.0.1:8080/books")
             .expect("Failed to parse URL.")
             .decoder(Json)
             .build(),
@@ -59,6 +58,7 @@ async fn main() {
             println!("No books matching query.");
         },
         Ok(v) => {
+            println!("Found books:");
             for book in v {
                 println!("{book}");
             }
@@ -68,6 +68,8 @@ async fn main() {
             return;
         },
     }
+
+    println!();
 
     let query = And(
         Book::author().eq("George Orwell"),
@@ -81,6 +83,7 @@ async fn main() {
             println!("No books matching query.");
         },
         Ok(v) => {
+            println!("Found books:");
             for book in v {
                 println!("{book}");
             }
