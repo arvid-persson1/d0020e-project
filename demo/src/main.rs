@@ -15,6 +15,7 @@ use serde::Deserialize;
 use std::fmt::{Display, Error as FmtError, Formatter};
 use tokio::main;
 
+/// Building book
 #[derive(Deserialize, Debug, Queryable)]
 struct Book {
     title: String,

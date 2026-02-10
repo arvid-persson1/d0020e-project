@@ -45,6 +45,8 @@ where
     T: Send,
 {
     /// Constructs a broker with no sources.
+    #[must_use]
+    #[inline]
     pub fn new() -> Self {
         Self {
             sources: Vec::new(),

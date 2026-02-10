@@ -8,7 +8,7 @@ use parking_lot::Mutex;
 use uuid::Uuid;
 
 /// Available book formats
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 enum BookFormatType {
     /// pdf format
     Pdf,
@@ -61,14 +61,50 @@ struct AppState {
     books: Mutex<Vec<Book>>,
 }
 
+/// Query parameters for searching books.
+///
+/// All fields are optional. When a field is present, it is used to
+/// filter the returned books. Multiple fields are combined using
+/// logical AND semantics.
+#[derive(Deserialize)]
+struct BookSearch {
+    /// Filter books by exact title match.
+    ///
+    /// Example:
+    /// `GET /books?title=Moby%20Dick`
+    title: Option<String>,
+    /// Filter books by exact author name.
+    ///
+    /// Example:
+    /// `GET /books?author=Herman%20Melville`
+    author: Option<String>,
+    /// Filter books by book format.
+    ///
+    /// Example:
+    /// `GET /books?format=Pdf`
+    format: Option<BookFormatType>,
+}
+
 /// Returns all books currently stored.
 ///
 /// # Panics
 /// Panics if acquiring the books mutex fails.
-async fn get_books(data: web::Data<AppState>) -> impl Responder {
-    let books = data.books.lock();
+async fn get_books(query: web::Query<BookSearch>, data: web::Data<AppState>) -> impl Responder {
+    let results: Vec<Book> = {
+        let books = data.books.lock();
 
-    HttpResponse::Ok().json(&*books)
+        books
+            .iter()
+            .filter(|b| {
+                query.title.as_ref().is_none_or(|t| b.title == *t)
+                    && query.author.as_ref().is_none_or(|a| b.author == *a)
+                    && query.format.as_ref().is_none_or(|f| b.format == *f)
+            })
+            .cloned()
+            .collect()
+    };
+
+    HttpResponse::Ok().json(results)
 }
 
 /// Returns specific book
@@ -109,7 +145,22 @@ async fn create_book(book: web::Json<CreateBook>, data: web::Data<AppState>) -> 
 #[actix_web::main]
 async fn main() -> Result<()> {
     let app_state = web::Data::new(AppState {
-        books: Mutex::new(vec![]),
+        books: Mutex::new(vec![
+            Book {
+                id: Uuid::new_v4(),
+                title: "Pride and Prejudice".to_string(),
+                author: "Jane Austen".to_string(),
+                format: BookFormatType::Paperback,
+                isbn: Isbn("9780141439518".to_string()),
+            },
+            Book {
+                id: Uuid::new_v4(),
+                title: "Moby Dick".to_string(),
+                author: "Herman Melville".to_string(),
+                format: BookFormatType::Hardcover,
+                isbn: Isbn("9781503280786".to_string()),
+            },
+        ]),
     });
 
     println!("Bookstore API running at http://localhost:8080");
