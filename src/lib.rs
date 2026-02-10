@@ -89,6 +89,15 @@ where
     }
 }
 
+impl<T> Default for Broker<T>
+where
+    T: Send,
+{
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[async_trait]
 impl<T> Source<T> for Broker<T>
 where
