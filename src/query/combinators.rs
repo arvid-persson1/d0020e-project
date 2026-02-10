@@ -26,7 +26,7 @@ pub struct Eq<'a, F, V: ?Sized> {
     /// The field to check equality on.
     pub(super) field: F,
     /// The value to compare the field to.
-    pub(super) value: &'a V,
+    pub value: &'a V,
 }
 
 /// Checks if the field specified by `field` is not equal to `value`.
@@ -37,7 +37,7 @@ pub struct Ne<'a, F, V: ?Sized> {
     /// The field to check inequality on.
     pub(super) field: F,
     /// The value to compare the field to.
-    pub(super) value: &'a V,
+    pub value: &'a V,
 }
 
 /// Checks if the field specified by `field` is greater than `value`.
@@ -48,7 +48,7 @@ pub struct Gt<'a, F, V: ?Sized> {
     /// The field to perform comparison on.
     pub(super) field: F,
     /// The value to compare the field to.
-    pub(super) value: &'a V,
+    pub value: &'a V,
 }
 
 /// Checks if the field specified by `field` is lesser than `value`.
@@ -59,24 +59,24 @@ pub struct Lt<'a, F, V: ?Sized> {
     /// The field to perform comparison on.
     pub(super) field: F,
     /// The value to compare the field to.
-    pub(super) value: &'a V,
+    pub value: &'a V,
 }
 
 /// Performs AND on the two subqueries.
 #[derive(Clone)]
-pub struct And<L, R>(pub(super) L, pub(super) R);
+pub struct And<L, R>(pub L, pub R);
 
 /// Performs OR on the two subqueries.
 #[derive(Clone)]
-pub struct Or<L, R>(pub(super) L, pub(super) R);
+pub struct Or<L, R>(pub L, pub R);
 
 /// Performs XOR on the two subqueries.
 #[derive(Clone)]
-pub struct Xor<L, R>(pub(super) L, pub(super) R);
+pub struct Xor<L, R>(pub L, pub R);
 
 /// Negates a query.
 #[derive(Clone)]
-pub struct Not<Q>(pub(super) Q);
+pub struct Not<Q>(pub Q);
 
 // TODO: Possible future combinators:
 // - Remaining comparators: `Ge`, `Le`.
