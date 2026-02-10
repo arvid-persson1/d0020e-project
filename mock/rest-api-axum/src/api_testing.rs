@@ -96,7 +96,7 @@ async fn book_test() {
     let isbn_target = "9780316497541";
 
     let get_reqst = client
-        .get(format!("http://{addrs}/books/{isbn_target}"))
+        .get(format!("http://{addrs}/book?isbn={isbn_target}"))
         .send()
         .await
         .expect("Failed to send request");
@@ -110,8 +110,22 @@ async fn book_test() {
         .await
         .expect("Failed to retrieve response text");
 
+    //println!("Got body: {body3}");
+
     assert!(body3.contains("<title>The Last Wish: Introducing the Witcher</title>"));
     assert!(body3.contains("<isbn>9780316497541</isbn>"));
+
+    // Test searching by Author (New Feature!)
+    let get_author_reqst = client
+        .get(format!("http://{addrs}/book?author=Andrzej%20Sapkowski"))
+        .send()
+        .await
+        .expect("Failed to send author request");
+
+    assert_eq!(get_author_reqst.status(), 200);
+
+    let body_author = get_author_reqst.text().await.expect("Failed to get text");
+    assert!(body_author.contains("The Last Wish"));
 
     let get_list_reqst = client
         .get(format!("http://{addrs}/books"))

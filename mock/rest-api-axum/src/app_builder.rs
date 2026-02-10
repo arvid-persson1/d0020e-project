@@ -21,7 +21,7 @@ pub fn build_app() -> Router {
 
     let app: Router = Router::new()
         .route("/books", get(get_books))
-        .route("/books/{isbn}", get(get_book))
+        .route("/book", get(get_book))
         .route("/books", post(add_book))
         .with_state(state);
 

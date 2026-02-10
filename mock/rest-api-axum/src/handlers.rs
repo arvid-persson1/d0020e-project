@@ -21,11 +21,16 @@ enum BookFormatType {
     Paperback,
 }
 
+///Struct for book query search parameters
 #[derive(Deserialize)]
 pub(crate) struct BookSearch {
+    /// Isbn query parameter
     isbn: Option<String>,
+    /// Title query parameter
     title: Option<String>,
+    /// Author query parameter
     author: Option<String>,
+    /// Format query parameter.
     format: Option<BookFormatType>,
 }
 
@@ -105,7 +110,6 @@ pub(crate) async fn get_book(
     Query(params): Query<BookSearch>,
 ) -> Result<impl IntoResponse, StatusCode> {
     let book_option = {
-        // If the lock fails, this returns Err(500) immediately.
         let books_guard = state
             .books
             .lock()
@@ -119,16 +123,12 @@ pub(crate) async fn get_book(
                 let matches_title = params.title.as_ref().is_none_or(|q| q == &book.title);
                 let matches_format = params.format.as_ref().is_none_or(|q| q == &book.format);
 
-                // A book is a "match" only if ALL provided criteria are true
                 matches_isbn && matches_author && matches_title && matches_format
             })
             .cloned()
     };
 
-    book_option.map_or(
-        Err(StatusCode::NOT_FOUND), // If None (Not Found)
-        |book| Ok(Xml(book)),       // If Some (Found)
-    )
+    book_option.map_or(Err(StatusCode::NOT_FOUND), |book| Ok(Xml(book)))
 }
 
 /// Creates a new book
@@ -143,19 +143,15 @@ pub(crate) async fn get_book(
 pub(crate) async fn add_book(
     State(state): State<Arc<AppState>>,
     Xml(new_book): Xml<Book>,
-) -> impl IntoResponse {
-    state.books.lock().map_or_else(
-        |_| {
-            // The Mutex is poisoned (another thread panicked while holding it).
-            // We log the error (optional) and return a 500 error to the client.
-            eprintln!("ERROR: Mutex is poisoned!");
-            Err(StatusCode::INTERNAL_SERVER_ERROR)
-        },
-        |mut books_guard| {
-            // Success! We have the guard.
-            books_guard.push(new_book.clone());
-            // Return the success tuple wrapped in Ok()
-            Ok((StatusCode::CREATED, Xml(new_book)))
-        },
-    )
+) -> Result<impl IntoResponse, StatusCode> {
+    state
+        .books
+        .lock()
+        .map_err(|_err| {
+            eprintln!("ERROR: Mutex poisoned while creating book");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?
+        .push(new_book.clone());
+
+    Ok((StatusCode::CREATED, Xml(new_book)))
 }
