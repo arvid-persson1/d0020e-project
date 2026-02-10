@@ -184,8 +184,10 @@ where
     async fn fetch_all(&mut self, query: &(dyn Query<T> + Sync)) -> Result<Vec<T>, FetchError> {
         let Single { query, residue } = query.to_http_single();
 
-        let bytes = fetch_impl(&self.client, self.url.clone(), self.method.clone(), query).await?;
-        let bytes = bytes.bytes().await?;
+        let bytes = fetch_impl(&self.client, self.url.clone(), self.method.clone(), query)
+            .await?
+            .bytes()
+            .await?;
 
         self.decoder
             .decode_all(&bytes)
