@@ -1,4 +1,8 @@
-use axum::{extract::Query, extract::State, http::StatusCode, response::IntoResponse};
+use axum::{
+    extract::{Query, State},
+    http::StatusCode,
+    response::IntoResponse,
+};
 
 use serde::{Deserialize, Serialize};
 
@@ -8,7 +12,7 @@ use std::sync::{Arc, Mutex};
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 /// Type for the supported book formats
-enum BookFormatType {
+pub(crate) enum BookFormatType {
     /// Format for PDF
     Pdf,
     /// Format for docx (Word)
@@ -39,25 +43,13 @@ pub(crate) struct BookSearch {
 /// The Book type
 pub(crate) struct Book {
     /// The book title
-    title: String,
+    pub(crate) title: String,
     /// The book author
-    author: String,
+    pub(crate) author: String,
     /// The book format
-    format: BookFormatType,
+    pub(crate) format: BookFormatType,
     /// The book isbn
-    isbn: String,
-}
-
-impl Book {
-    // This function only compiles when running 'cargo test'
-    #[cfg(test)]
-    pub(crate) fn get_title(&self) -> &str {
-        &self.title
-    }
-    #[cfg(test)]
-    pub(crate) fn get_isbn(&self) -> &str {
-        &self.isbn
-    }
+    pub(crate) isbn: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -84,18 +76,40 @@ pub(crate) struct AppState {
 #[inline]
 pub(crate) async fn get_books(
     State(state): State<Arc<AppState>>,
+    Query(params): Query<BookSearch>,
 ) -> Result<impl IntoResponse, StatusCode> {
-    // map_err catches the "poison" error and converts it to a 500 code
-    let books_vector = state
-        .books
-        .lock()
-        .map_err(|_err| StatusCode::INTERNAL_SERVER_ERROR)?
-        .clone();
+    let filtered_books = {
+        let books = state.books.lock().map_err(|e| {
+            eprintln!("Internal Error: Mutex was poisoned: {e}");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
 
-    // We wrap the response in BookList to satisfy the XML root element requirement
-    Ok(Xml(BookList {
-        books: books_vector,
-    }))
+        books
+            .iter()
+            .filter(|book| {
+                let match_author = params
+                    .author
+                    .as_ref()
+                    .is_none_or(|q| book.author.contains(q));
+
+                let match_title = params.title.as_ref().is_none_or(|q| book.title.contains(q));
+
+                let match_isbn = params.isbn.as_ref().is_none_or(|q| book.isbn == *q);
+
+                let match_format = params.format.as_ref().is_none_or(|q| book.format == *q);
+
+                match_author && match_title && match_isbn && match_format
+            })
+            .cloned()
+            .collect::<Vec<Book>>()
+    };
+
+    Ok((
+        StatusCode::OK,
+        Xml(BookList {
+            books: filtered_books,
+        }),
+    ))
 }
 
 /// Fetches a book by isbn (id)
