@@ -1,6 +1,6 @@
 //! This might be a missleading name, but all it's just a file that contains the different ways you interact via GraphQL e.g mutations or queries.
 use crate::{
-    book_schema::{Book, BookInput},
+    book_schema::{Book, BookInput, FilteredBook},
     db::Db,
 };
 use async_graphql::{Object, Result};
@@ -13,24 +13,27 @@ pub(crate) struct Query {
 
 #[Object]
 impl Query {
-    /// GraphQL query that returns book with corresponding isbn number.
+    /// GraphQL query that returns a book with corresponding input.
     ///
-    /// Queries look might look like this:
-    ///     query {
-    ///     getBook(isbn: "1") {
-    /// 	    title
-    /// 	    author
-    /// 	    format
+    /// # Example
+    /// query {
+    ///     getBooks(
+    ///         filter: {format: HARDCOVER, author: "George Orwell"}
+    ///     )
+    ///     {
+    ///         title
+    ///         isbn
     ///     }
     /// }
-    async fn get_book(&self, isbn: String) -> Option<Book> {
-        self.db.get_book(isbn).await
+    async fn get_books(&self, filter: FilteredBook) -> Vec<Book> {
+        self.db.get_books(filter).await
     }
 
-    /// GraphQL query that returns all books within the existing database
+    /// # Example
     ///
-    ///     query {
+    /// query {
     ///     getAllBooks {
+    ///         isbn
     /// 	    title
     /// 	    author
     /// 	    format
@@ -49,21 +52,22 @@ pub(crate) struct Mutation {
 
 #[Object]
 impl Mutation {
-    /// GraphQL mutation that adds a book to the database. `BookFormatType` was chosen here to avoid errors).
+    /// GraphQL mutation that adds multiple books to the database.
+    /// Please note that some return value is required.
     ///
-    /// When sending making the request you can write something like:
+    /// # Example
+    /// Please note that the title in the example below gets returned in order to see that things worked out properly
+    ///
     /// mutation {
-    ///     insertBook(book: [
-    /// 	{ isbn: "1", title: "Book 1", author: "Author A", format: HARDCOVER },
-    ///     { isbn: "2", title: "Book 2", author: "Author B", format: PAPERBACK },
-    ///     { isbn: "3", title: "Book 3", author: "Author C", format: EPUB },
-    ///     ]) {
-    ///         title
-    ///         isbn
+    ///     insertBook(
+    ///         book: {isbn: "3", title: "1984", author: "George Orwell", format: HARDCOVER}
+    ///     )
+    ///     {
+    ///	        title
     ///     }
     /// }
     /// # Errors
-    /// Returns error if the book didn't insert properly
+    /// Returns an error if any of the books couldn't be inserted properly
     async fn insert_book(&self, book: BookInput) -> Result<Book> {
         // Book is shadowed here since we want values to return aswell.
         let book = self.db.insert_book(book).await?;
@@ -71,16 +75,24 @@ impl Mutation {
         Ok(book)
     }
 
-    /// GraphQL mutation that adds multiple books to the database
+    /// GraphQL mutation that adds a book to the database. `BookFormatType` was chosen here to avoid errors).
+    /// Please note that some return value is required.
     ///
-    /// When sending making the request you can write something like:
+    /// # Example
     /// mutation {
-    ///     insertBook(book: {isbn: "2", title: "thatBook", author: "Shakespeare", format: HARDCOVER}) {
-    ///	     format
+    ///     insertBook(
+    ///         books: [
+    /// 	        { isbn: "1", title: "Book 1", author: "Author A", format: HARDCOVER },
+    ///             { isbn: "2", title: "Book 2", author: "Author B", format: PAPERBACK },
+    ///             { isbn: "3", title: "Book 3", author: "Author C", format: EPUB },
+    ///         ]
+    ///     )
+    ///     {
+    ///         title
     ///     }
     /// }
     /// # Errors
-    /// Returns an error if any of the books couldn't be inserted properly
+    /// Returns error if the book didn't insert properly
     async fn insert_books(&self, books: Vec<BookInput>) -> Result<Vec<Book>> {
         let mut inserted = vec![];
 

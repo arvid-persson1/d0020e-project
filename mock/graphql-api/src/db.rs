@@ -1,5 +1,5 @@
 //! A file containing all functions that are needed for the database
-use crate::book_schema::{Book, BookInput};
+use crate::book_schema::{Book, BookInput, FilteredBook};
 use sqlx::sqlite::SqlitePool;
 
 /// A struct representing the database
@@ -23,7 +23,7 @@ impl Db {
         // This is to make sure the table actually exists. Note that I don't actually want to use the query result.
         let _ = sqlx::query(
             "CREATE TABLE IF NOT EXISTS book (
-                isbn TEXT PRIMARY KEY NOT NULL,
+                isbn TEXT NOT NULL,
                 title TEXT NOT NULL,
                 author TEXT NOT NULL,
                 format TEXT NOT NULL
@@ -45,16 +45,24 @@ impl Db {
             .unwrap_or_default()
     }
 
-    /// Returns the book with a matching isbn number within the database. Note that:
-    /// - Since the isbn is the primary key there's a maximum of one matching row/book.
-    /// - The isbn number is syntax-sensitive, meaning it needs to be spelled the EXACT same way it is in the database.
-    pub(crate) async fn get_book(&self, isbn: String) -> Option<Book> {
-        sqlx::query_as::<_, Book>("SELECT isbn, title, author, format FROM book WHERE isbn = $1")
-            .bind(isbn)
-            .fetch_optional(&self.pool)
-            .await
-            .ok()
-            .flatten()
+    /// A query that returns an array of books matching the input.
+    // NOTE: sqlx just removes the Some and looks for the values instead.
+    pub(crate) async fn get_books(&self, filter: FilteredBook) -> Vec<Book> {
+        // This is the fastest way I came up with in a short time.
+        sqlx::query_as::<_, Book>(
+            "SELECT isbn, title, author, format FROM book 
+            WHERE ($1 IS NULL OR isbn = $1)
+            AND ($2 IS NULL OR title = $2)
+            AND ($3 IS NULL OR author = $3)
+            AND ($4 IS NULL OR format = $4)",
+        )
+        .bind(filter.isbn)
+        .bind(filter.title)
+        .bind(filter.author)
+        .bind(filter.format)
+        .fetch_all(&self.pool)
+        .await
+        .unwrap_or_default()
     }
 
     /// Adds a book to the database, also returns the resulting book if it worked out

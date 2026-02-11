@@ -13,6 +13,9 @@ pub mod book_schema;
 pub mod db;
 pub mod queries;
 
+/// The address on which the graphql-api is opened.
+const ADDRESS: &str = "127.0.0.1:8081";
+
 /// A type introduced just to make the handler a bit more readable.
 type MySchema = Schema<Query, Mutation, EmptySubscription>;
 
@@ -42,7 +45,7 @@ async fn main() {
     let app = Router::new()
         .route("/graphql", post(handler))
         .with_state(schema);
-    let listener = TcpListener::bind("127.0.0.1:8081")
+    let listener = TcpListener::bind(ADDRESS)
         .await
         .expect("Unable to bind ip address");
     println!("Server's on http://127.0.0.1:8081");

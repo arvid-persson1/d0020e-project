@@ -35,6 +35,20 @@ pub(crate) enum BookFormatType {
     Paperback,
 }
 
+/// A struct representing the possible values of a book.
+/// Used for filtering queries.
+#[derive(InputObject, Clone, Debug)]
+pub(crate) struct FilteredBook {
+    /// The existance (or not) of an isbn number of the book.
+    pub(crate) isbn: Option<String>,
+    /// The existance (or not) of a title of the book.
+    pub(crate) title: Option<String>,
+    /// The existance (or not) of an author of the book.
+    pub(crate) author: Option<String>,
+    /// The existance (or not) of a format of the book.
+    pub(crate) format: Option<BookFormatType>,
+}
+
 // --- Needed for inserting ---
 /// A representation of a book, but used specifically for inserts
 #[derive(InputObject, Clone, Debug)]
