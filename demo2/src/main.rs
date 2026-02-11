@@ -85,14 +85,14 @@ async fn main() {
     println!("Registered source (REST endpoint on 127.0.0.1:1616).");
 
     let query = And(
-        Book::author().eq("George Orwell"),
+        Book::author().eq("Andrzej Sapkowski"),
         Or(
-            Book::title().eq("Nineteen Eighty-Four"),
-            Book::title().eq("Animal Farm"),
+            Book::title().eq("The Last Wish: Introducing the Witcher"),
+            Book::title().eq("Sword of Destiny: Tales of the Witcher"),
         ),
     );
 
-    //println!("{query:#?}");
+    println!("The query: {query:#?}");
 
     println!("Sending query...");
     let results = broker.fetch_all(&query).await;

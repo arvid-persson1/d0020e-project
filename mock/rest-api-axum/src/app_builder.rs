@@ -21,12 +21,6 @@ pub fn build_app() -> Router {
             format: BookFormatType::Paperback,
         },
         Book {
-            title: "Moby Dick".to_owned(),
-            author: "Herman Melville".to_owned(),
-            isbn: "9781503280786".to_owned(),
-            format: BookFormatType::Hardcover,
-        },
-        Book {
             title: "Nineteen Eighty-Four".to_owned(),
             author: "George Orwell".to_owned(),
             isbn: "9780141036144".to_owned(),
@@ -36,6 +30,12 @@ pub fn build_app() -> Router {
             title: "The Last Wish: Introducing the Witcher".to_owned(),
             author: "Andrzej Sapkowski".to_owned(),
             isbn: "9780316497541".to_owned(),
+            format: BookFormatType::Paperback,
+        },
+        Book {
+            title: "Sword of Destiny: Tales of the Witcher".to_owned(),
+            author: "Andrzej Sapkowski".to_owned(),
+            isbn: "9781473231085".to_owned(),
             format: BookFormatType::Paperback,
         },
     ];
