@@ -14,6 +14,7 @@ use futures::{
     future::try_join_all,
     stream::{BoxStream, FuturesUnordered, select_all},
 };
+use std::{hash::Hash, collections::HashSet};
 use tokio as _;
 
 pub mod errors;
@@ -104,7 +105,7 @@ where
 #[async_trait]
 impl<T> Source<T> for Broker<T>
 where
-    T: Send,
+    T: Eq + Hash + Send,
 {
     #[inline]
     async fn fetch<'s>(
@@ -133,18 +134,16 @@ where
             .iter()
             .map(|source| source.size_hint(query).0)
             .sum();
-        let mut out = Vec::with_capacity(min_capacity);
+        let mut out = HashSet::with_capacity(min_capacity);
 
-        let futures = self
+        for per_source in self
             .sources
             .iter_mut()
-            .map(|source| source.fetch_all(query))
-            .collect::<Vec<_>>();
-        for vec in try_join_all(futures).await? {
-            out.extend(vec);
+            .map(|source| source.fetch_all(query)) {
+            out.extend(per_source.await?);
         }
 
-        Ok(out)
+        Ok(out.into_iter().collect())
     }
 
     #[inline]
