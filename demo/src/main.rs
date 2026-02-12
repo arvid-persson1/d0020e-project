@@ -1,9 +1,12 @@
 #![expect(missing_docs, reason = "Demo code.")]
 #![allow(dead_code, reason = "Demo code.")]
+#![allow(clippy::missing_panics_doc, reason = "Demo code.")]
+#![allow(clippy::use_debug, reason = "Demo code.")]
+#![allow(clippy::shadow_unrelated, reason = "Demo code.")]
 
 use broker::{
     Broker,
-    connector::Source,
+    connector::Source as _,
     encode::json::Json,
     query::{
         Queryable,
@@ -50,7 +53,7 @@ async fn main() {
     println!();
 
     let query = Book::author().eq("Jane Austen");
-    println!("Defined query: {query:#?}\n");
+    println!("Defined query:\n{query:#?}");
 
     let results = broker.fetch_all(&query).await;
     match results {
@@ -75,7 +78,7 @@ async fn main() {
         Book::author().eq("George Orwell"),
         Or(Book::title().eq("1984"), Book::title().eq("Animal Farm")),
     );
-    println!("Defined query: {query:#?} [1 residue]\n");
+    println!("Defined query:\n{query:#?}\n[1 residue]");
 
     let results = broker.fetch_all(&query).await;
     match results {
