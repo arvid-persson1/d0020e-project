@@ -1,5 +1,5 @@
 //! Demo of the axum rest api serving XML
-
+#![allow(clippy::use_debug, reason = "Demo code.")]
 #![allow(clippy::missing_panics_doc, reason = "Demo code")]
 
 use broker::{
@@ -30,6 +30,8 @@ enum BookFormatType {
     Hardcover,
     /// Format for Paperback
     Paperback,
+    /// Pocket edition
+    Pocket,
 }
 
 impl Display for BookFormatType {
@@ -41,6 +43,7 @@ impl Display for BookFormatType {
             Self::Epub => write!(f, "Epub"),
             Self::Hardcover => write!(f, "Hardcover"),
             Self::Paperback => write!(f, "Paperback"),
+            Self::Pocket => write!(f, "Pocket"),
         }
     }
 }

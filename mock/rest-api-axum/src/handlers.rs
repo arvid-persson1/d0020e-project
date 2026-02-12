@@ -23,6 +23,8 @@ pub(crate) enum BookFormatType {
     Hardcover,
     /// Format for Paperback
     Paperback,
+    /// Pocket edition
+    Pocket,
 }
 
 ///Struct for book query search parameters
