@@ -3,6 +3,7 @@
 #![allow(clippy::missing_panics_doc, reason = "Demo code.")]
 #![allow(clippy::use_debug, reason = "Demo code.")]
 #![allow(clippy::shadow_unrelated, reason = "Demo code.")]
+#![allow(clippy::missing_docs_in_private_items, reason = "Demo code.")]
 
 use broker::{
     Broker,
