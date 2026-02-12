@@ -164,13 +164,6 @@ async fn main() -> Result<()> {
             },
             Book {
                 id: Uuid::new_v4(),
-                title: "1984".to_owned(),
-                author: "George Orwell".to_owned(),
-                format: BookFormatType::Paperback,
-                isbn: Isbn("9780141036144".to_owned()),
-            },
-            Book {
-                id: Uuid::new_v4(),
                 title: "Animal Farm".to_owned(),
                 author: "George Orwell".to_owned(),
                 format: BookFormatType::Paperback,
@@ -180,8 +173,8 @@ async fn main() -> Result<()> {
                 id: Uuid::new_v4(),
                 title: "1984".to_owned(),
                 author: "George Orwell".to_owned(),
-                format: BookFormatType::Pocket,
-                isbn: Isbn("9789173539678".to_owned()),
+                format: BookFormatType::Paperback,
+                isbn: Isbn("9780141036144".to_owned()),
             },
         ]),
     });

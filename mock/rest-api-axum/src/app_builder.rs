@@ -21,12 +21,6 @@ pub fn build_app() -> Router {
             format: BookFormatType::Paperback,
         },
         Book {
-            title: "Nineteen Eighty-Four".to_owned(),
-            author: "George Orwell".to_owned(),
-            isbn: "9780141036144".to_owned(),
-            format: BookFormatType::Paperback,
-        },
-        Book {
             title: "The Last Wish: Introducing the Witcher".to_owned(),
             author: "Andrzej Sapkowski".to_owned(),
             isbn: "9780316497541".to_owned(),
@@ -37,6 +31,12 @@ pub fn build_app() -> Router {
             author: "Andrzej Sapkowski".to_owned(),
             isbn: "9781473231085".to_owned(),
             format: BookFormatType::Paperback,
+        },
+        Book {
+            title: "1984".to_owned(),
+            author: "George Orwell".to_owned(),
+            format: BookFormatType::Pocket,
+            isbn: "9789173539678".to_owned(),
         },
     ];
 
