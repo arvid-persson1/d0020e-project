@@ -1,0 +1,21 @@
+[package]
+name = "api-broker"
+categories.workspace = true
+description.workspace = true
+edition.workspace = true
+keywords.workspace = true
+license.workspace = true
+readme.workspace = true
+repository.workspace = true
+version.workspace = true
+
+[dependencies]
+axum = "0.7"
+tokio = { version = "1", features = ["full"] }
+serde = { version = "1", features = ["derive"] }
+
+broker = { features = ["rest"], workspace = true }
+tower-http = { version = "0.6.8", features = ["cors"] }
+
+[lints]
+workspace = true
