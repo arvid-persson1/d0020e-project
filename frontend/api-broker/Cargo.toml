@@ -13,7 +13,7 @@ version.workspace = true
 axum = "0.7"
 tokio = { version = "1", features = ["full"] }
 serde = { version = "1", features = ["derive"] }
-
+sqlx = { version = "0.8", features = ["sqlite", "runtime-tokio", "macros"] }
 broker = { features = ["rest"], workspace = true }
 tower-http = { version = "0.6.8", features = ["cors"] }
 

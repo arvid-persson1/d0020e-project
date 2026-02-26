@@ -26,3 +26,29 @@ async function search() {
         resultsList.appendChild(li);
     });
 }
+
+document.getElementById("addBookForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    const book = {
+        title: document.getElementById("title").value,
+        author: document.getElementById("author").value,
+        isbn: document.getElementById("isbn").value
+    };
+
+    try {
+        const response = await fetch("http://localhost:3000/books", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(book)
+        });
+
+        const result = await response.json();
+
+        document.getElementById("addResult").innerText = result;
+    } catch (error) {
+        document.getElementById("addResult").innerText = "Error adding book";
+    }
+});
