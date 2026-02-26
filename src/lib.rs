@@ -14,7 +14,7 @@ use futures::{
     future::try_join_all,
     stream::{BoxStream, FuturesUnordered, select_all},
 };
-use std::{hash::Hash, collections::HashSet};
+use std::{collections::HashSet, hash::Hash};
 use tokio as _;
 
 pub mod errors;
@@ -139,7 +139,8 @@ where
         for per_source in self
             .sources
             .iter_mut()
-            .map(|source| source.fetch_all(query)) {
+            .map(|source| source.fetch_all(query))
+        {
             out.extend(per_source.await?);
         }
 
