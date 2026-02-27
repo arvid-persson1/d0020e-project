@@ -1,16 +1,18 @@
 //! Connector for REST APIs.
 
 use crate::{
+    Query,
     connector::{Sink, Source},
     encode::{Codec, Decode, Encode},
     errors::{ConnectionError, DecodeError, FetchError, FetchOneError, SendError},
+    query::{HttpQuery, Single},
 };
-use futures::{Stream, StreamExt as _};
+use async_trait::async_trait;
+use futures::{StreamExt as _, TryStreamExt as _, future::ready, stream::BoxStream};
 use reqwest::{Body, Client, Method, Response, Url};
-use serde::Serialize;
 use std::{io::Error as IoError, marker::PhantomData};
 
-/// The [`Builder`](builder::Builder), used to construct REST connectors more flexibly.
+/// The [`Builder`], used to construct REST connectors more flexibly.
 mod builder;
 pub use builder::*;
 
@@ -19,12 +21,10 @@ pub use builder::*;
 /// This makes no assumption about the format used to communicate with the API, but delegates this
 /// work to its [`decoder`](Decode).
 ///
-/// [`Source`] is implemented for `&mut self` to allow for stateful decoders, see trait
-/// documentation for more information. Note that the type `(&str, &str)` and some similar types
-/// **cannot** be serialized to query parameters, but an array or a slice like `&[(&str, &str)]`
-/// can.
+/// Note that the type `(&str, &str)` and some similar types **cannot** be serialized to query
+/// parameters, but alternatives like `&[(&str, &str)]` can.
 #[derive(Debug, Clone)]
-pub struct ReadOnly<T, Q, D> {
+pub struct ReadOnly<T, D> {
     /// The URL to fetch data from.
     url: Url,
     /// The HTTP method to use when fetching data.
@@ -33,19 +33,16 @@ pub struct ReadOnly<T, Q, D> {
     client: Client,
     /// The decoder used to deserialize received data.
     decoder: D,
-    /// Satisfies missing fields using `T` and `Q`.
+    /// Satisfies missing fields using `T`.
     // TODO: This may be overly restrictive when considering variance. Improve using unstable
     // `phantom_variance_markers` (#135806)?
-    _phantom: PhantomData<(T, Q)>,
+    _phantom: PhantomData<T>,
 }
 
 /// A sink to work with REST APIs.
 ///
 /// This makes no assumption about the format used to communicate with the API, but delegates this
 /// work to its [`encoder`](Encode).
-///
-/// [`Sink`] is implemented for `&mut self` to allow for stateful decoders, see trait
-/// documentation for more information.
 #[derive(Debug, Clone)]
 pub struct WriteOnly<T, E> {
     /// The URL to send data to.
@@ -56,7 +53,7 @@ pub struct WriteOnly<T, E> {
     client: Client,
     /// The encoder used to serialize data to be sent.
     encoder: E,
-    /// Satisfies missing fields using `T` and `Q`.
+    /// Satisfies missing fields using `T`.
     // TODO: This may be overly restrictive when considering variance. Improve using unstable
     // `phantom_variance_markers` (#135806)?
     _phantom: PhantomData<T>,
@@ -67,12 +64,10 @@ pub struct WriteOnly<T, E> {
 /// This makes no assumption about the format used to communicate with the API, but delegates this
 /// work to its [`encoder`](Encode) and [`decoder`](Decode).
 ///
-/// [`Source`] and [`Sink`] are implemented for `&mut self` to allow for stateful encoders or
-/// decoders, see trait documentation for more information. Note that the type `(&str, &str)` and
-/// some similar types **cannot** be serialized to query parameters, but an array or a slice like
-/// `&[(&str, &str)]` can.
+/// Note that the type `(&str, &str)` and some similar types **cannot** be serialized to query
+/// parameters, but an array or a slice like `&[(&str, &str)]` can.
 #[derive(Debug, Clone)]
-pub struct ReadWrite<T, Q, E, D, C> {
+pub struct ReadWrite<T, E, D, C> {
     /// The URL to fetch data from.
     source_url: Url,
     /// The HTTP method to use when fetching data.
@@ -85,29 +80,26 @@ pub struct ReadWrite<T, Q, E, D, C> {
     client: Client,
     /// The codec used to serialize and deserialize data.
     codec: Codec<T, E, D, C>,
-    /// Satisfies missing fields using `T` and `Q`.
+    /// Satisfies missing fields using `T`.
     // TODO: This may be overly restrictive when considering variance. Improve using unstable
     // `phantom_variance_markers` (#135806)?
-    _phantom: PhantomData<(T, Q)>,
+    _phantom: PhantomData<T>,
 }
 
 /// Helper to use for [`Source`] implementation.
 ///
 /// # Errors
 ///
-/// If the request fails, returns the error as classified by [`classify_reqwest`].
-async fn fetch_impl<Q>(
+/// Fails if an error occurs during connection or if the query fails to serialize.
+async fn fetch_impl(
     client: &Client,
     url: Url,
     method: Method,
-    query: Q,
-) -> Result<Response, FetchError>
-where
-    Q: Serialize,
-{
+    query: HttpQuery<'_>,
+) -> Result<Response, FetchError> {
     // `RequestBuilder::build` also fails is the URL cannot be parsed. Although
-    // `<Url as IntoUrl>::into_url` can fail, it has already been validated that this is not
-    // the case. Hence, any error here stems from the query.
+    // `<Url as IntoUrl>::into_url` can fail, it has already been validated that this will not
+    // happen here. Hence, any error here stems from the query.
     let request = client
         .request(method, url)
         .query(&query)
@@ -116,15 +108,12 @@ where
     client.execute(request).await.map_err(Into::into)
 }
 
-#[expect(
-    clippy::missing_panics_doc,
-    reason = "Panic should not occur here. See comment."
-)]
+#[expect(clippy::missing_panics_doc, reason = "See implementation.")]
 /// Helper to use for [`Sink`] implementation.
 ///
 /// # Errors
 ///
-/// If the request fails, returns the error as classified by [`classify_reqwest`].
+/// Fails if an error occurs during connection.
 async fn send_impl<B>(
     client: &Client,
     url: Url,
@@ -134,84 +123,130 @@ async fn send_impl<B>(
 where
     B: Into<Body>,
 {
-    // `RequestBuilder::build` fails is the URL cannot be parsed. Although
-    // `<Url as IntoUrl>::into_url` can fail, it has already been validated during construction
-    // that this is not the case. Hence, this shouldn't fail.
-    let request = client
-        .request(method, url)
-        .body(body)
-        .build()
-        .expect("URL failed to parse.");
+    #[allow(
+        clippy::unwrap_used,
+        reason = "
+            `RequestBuilder::build` fails is the URL cannot be parsed. Although
+            `<Url as IntoUrl>::into_url` can fail, it has already been validated during
+            construction that this will not happen here.
+        "
+    )]
+    let request = client.request(method, url).body(body).build().unwrap();
     client.execute(request).await.map_err(Into::into)
 }
 
-impl<'a, T, Q, D> Source<'a, T> for &'a mut ReadOnly<T, Q, D>
+// TODO: Add support for query translation strategies. Currently uses only `to_http_single`, and
+// allows all residue.
+
+// TODO: Reduce code repetition.
+
+#[async_trait]
+impl<T, D> Source<T> for ReadOnly<T, D>
 where
     T: Send,
-    Q: Serialize + Send,
     D: Decode<T> + Send + Sync,
 {
-    type Query = Q;
-
     #[inline]
-    async fn fetch(
-        self,
-        query: Self::Query,
-    ) -> Result<impl Stream<Item = Result<T, FetchError>> + Send + Unpin, FetchError> {
-        let input = fetch_impl(&self.client, self.url.clone(), self.method.clone(), query)
+    async fn fetch<'s>(
+        &'s mut self,
+        query: &'s (dyn Query<T> + Sync),
+    ) -> Result<BoxStream<'s, Result<T, FetchError>>, FetchError>
+    where
+        T: 's,
+    {
+        let Single { query, residue } = query.to_http_single();
+
+        let bytes = fetch_impl(&self.client, self.url.clone(), self.method.clone(), query)
             .await?
             .bytes_stream()
-            .map(|res| {
-                res.map_err(|err| {
-                    // HTTP errors should be raised by `send`, and already have been returned.
-                    debug_assert!(err.status().is_none());
-                    ConnectionError::Io(IoError::other(err))
-                })
+            .map_err(|err| {
+                // HTTP errors should be raised by `fetch_impl`, and already have been returned.
+                debug_assert!(err.status().is_none());
+                ConnectionError::Io(IoError::other(err))
             });
+
+        let apply_residue = move |res| {
+            ready(match res {
+                Ok(entry) if residue.iter().all(|part| part.evaluate(&entry)) => Some(Ok(entry)),
+                Ok(_) => None,
+                Err(err) => Some(Err(FetchError::from(err))),
+            })
+        };
+
         self.decoder
-            .decode(input)
+            .decode(bytes)
             .await
-            .map(|output| output.map(|res| res.map_err(Into::into)))
+            .map(|output| output.filter_map(apply_residue).boxed())
             .map_err(Into::into)
     }
 
     #[inline]
-    async fn fetch_all(self, query: Self::Query) -> Result<Vec<T>, FetchError> {
+    async fn fetch_all(&mut self, query: &(dyn Query<T> + Sync)) -> Result<Vec<T>, FetchError> {
+        let Single { query, residue } = query.to_http_single();
+
         let bytes = fetch_impl(&self.client, self.url.clone(), self.method.clone(), query)
             .await?
             .bytes()
             .await?;
+
         self.decoder
             .decode_all(&bytes)
+            .map(|mut entries| {
+                entries.retain(|entry| residue.iter().all(|part| part.evaluate(entry)));
+                entries
+            })
             .map_err(|err| DecodeError(Box::new(err)).into())
     }
 
     #[inline]
-    async fn fetch_one(self, query: Self::Query) -> Result<T, FetchOneError> {
+    async fn fetch_one(&mut self, query: &(dyn Query<T> + Sync)) -> Result<T, FetchOneError> {
+        let Single { query, residue } = query.to_http_single();
+
         let bytes = fetch_impl(&self.client, self.url.clone(), self.method.clone(), query)
             .await?
-            .bytes()
-            .await?;
-        self.decoder.decode_one(&bytes).map_err(Into::into)
+            .bytes_stream()
+            .map_err(|err| {
+                // HTTP errors should be raised by `fetch_impl`, and already have been returned.
+                debug_assert!(err.status().is_none());
+                ConnectionError::Io(IoError::other(err))
+            });
+
+        // TODO: Fix this messy code.
+
+        let mut error = None;
+
+        let mut stream = self.decoder.decode(bytes).await?;
+        while let Some(result) = stream.next().await {
+            match result {
+                Ok(entry) if residue.iter().all(|part| part.evaluate(&entry)) => return Ok(entry),
+                Ok(_) => {},
+                Err(err) => error = Some(err),
+            }
+        }
+
+        Err(error.map_or(FetchOneError::NoSuchEntry, Into::into))
     }
 }
 
-impl<'a, T, Q, E, D, C> Source<'a, T> for &'a mut ReadWrite<T, Q, E, D, C>
+#[async_trait]
+impl<T, E, D, C> Source<T> for ReadWrite<T, E, D, C>
 where
     T: Send + Sync,
-    Q: Serialize + Send,
     E: Send + Sync,
     D: Decode<T> + Send + Sync,
     C: Decode<T> + Send + Sync,
 {
-    type Query = Q;
-
     #[inline]
-    async fn fetch(
-        self,
-        query: Self::Query,
-    ) -> Result<impl Stream<Item = Result<T, FetchError>> + Send + Unpin, FetchError> {
-        let input = fetch_impl(
+    async fn fetch<'s>(
+        &'s mut self,
+        query: &'s (dyn Query<T> + Sync),
+    ) -> Result<BoxStream<'s, Result<T, FetchError>>, FetchError>
+    where
+        T: 's,
+    {
+        let Single { query, residue } = query.to_http_single();
+
+        let bytes = fetch_impl(
             &self.client,
             self.source_url.clone(),
             self.source_method.clone(),
@@ -219,22 +254,31 @@ where
         )
         .await?
         .bytes_stream()
-        .map(|res| {
-            res.map_err(|err| {
-                // HTTP errors should be raised by `send`, and already have been returned.
-                debug_assert!(err.status().is_none());
-                ConnectionError::Io(IoError::other(err))
-            })
+        .map_err(|err| {
+            // HTTP errors should be raised by `fetch_impl`, and already have been returned.
+            debug_assert!(err.status().is_none());
+            ConnectionError::Io(IoError::other(err))
         });
+
+        let apply_residue = move |res| {
+            ready(match res {
+                Ok(entry) if residue.iter().all(|part| part.evaluate(&entry)) => Some(Ok(entry)),
+                Ok(_) => None,
+                Err(err) => Some(Err(FetchError::from(err))),
+            })
+        };
+
         self.codec
-            .decode(input)
+            .decode(bytes)
             .await
-            .map(|output| output.map(|res| res.map_err(Into::into)))
+            .map(|output| output.filter_map(apply_residue).boxed())
             .map_err(Into::into)
     }
 
     #[inline]
-    async fn fetch_all(self, query: Self::Query) -> Result<Vec<T>, FetchError> {
+    async fn fetch_all(&mut self, query: &(dyn Query<T> + Sync)) -> Result<Vec<T>, FetchError> {
+        let Single { query, residue } = query.to_http_single();
+
         let bytes = fetch_impl(
             &self.client,
             self.source_url.clone(),
@@ -244,13 +288,20 @@ where
         .await?
         .bytes()
         .await?;
+
         self.codec
             .decode_all(&bytes)
+            .map(|mut entries| {
+                entries.retain(|entry| residue.iter().all(|part| part.evaluate(entry)));
+                entries
+            })
             .map_err(|err| DecodeError(Box::new(err)).into())
     }
 
     #[inline]
-    async fn fetch_one(self, query: Self::Query) -> Result<T, FetchOneError> {
+    async fn fetch_one(&mut self, query: &(dyn Query<T> + Sync)) -> Result<T, FetchOneError> {
+        let Single { query, residue } = query.to_http_single();
+
         let bytes = fetch_impl(
             &self.client,
             self.source_url.clone(),
@@ -258,35 +309,36 @@ where
             query,
         )
         .await?
-        .bytes()
-        .await?;
-        self.codec.decode_one(&bytes).map_err(Into::into)
+        .bytes_stream()
+        .map_err(|err| {
+            // HTTP errors should be raised by `fetch_impl`, and already have been returned.
+            debug_assert!(err.status().is_none());
+            ConnectionError::Io(IoError::other(err))
+        });
+
+        // TODO: Fix this messy code.
+
+        let mut error = None;
+
+        let mut stream = self.codec.decode(bytes).await?;
+        while let Some(result) = stream.next().await {
+            match result {
+                Ok(entry) if residue.iter().all(|part| part.evaluate(&entry)) => return Ok(entry),
+                Ok(_) => {},
+                Err(err) => error = Some(err),
+            }
+        }
+
+        Err(error.map_or(FetchOneError::NoSuchEntry, Into::into))
     }
 }
 
+#[async_trait]
 impl<T, E> Sink<T> for WriteOnly<T, E>
 where
     T: Sync,
     E: Encode<T> + Sync,
 {
-    #[inline]
-    async fn send<'s, I>(&self, entries: I) -> Result<(), SendError>
-    where
-        T: 's,
-        I: IntoIterator<Item = &'s T>,
-    {
-        let body = self.encoder.encode(entries).map_err(SendError::Encode)?;
-        send_impl(
-            &self.client,
-            self.url.clone(),
-            self.method.clone(),
-            Vec::from(body),
-        )
-        .await
-        .map(|_| ())
-        .map_err(Into::into)
-    }
-
     #[inline]
     async fn send_all(&self, entries: &[T]) -> Result<(), SendError> {
         let body = self
@@ -319,32 +371,14 @@ where
     }
 }
 
-impl<T, Q, E, D, C> Sink<T> for ReadWrite<T, Q, E, D, C>
+#[async_trait]
+impl<T, E, D, C> Sink<T> for ReadWrite<T, E, D, C>
 where
     T: Sync,
-    Q: Sync,
     E: Encode<T> + Sync,
     D: Sync,
     C: Encode<T> + Sync,
 {
-    #[inline]
-    async fn send<'s, I>(&self, entries: I) -> Result<(), SendError>
-    where
-        T: 's,
-        I: IntoIterator<Item = &'s T>,
-    {
-        let body = self.codec.encode(entries).map_err(SendError::Encode)?;
-        send_impl(
-            &self.client,
-            self.sink_url.clone(),
-            self.sink_method.clone(),
-            Vec::from(body),
-        )
-        .await
-        .map(|_| ())
-        .map_err(Into::into)
-    }
-
     #[inline]
     async fn send_all(&self, entries: &[T]) -> Result<(), SendError> {
         let body = self.codec.encode_all(entries).map_err(SendError::Encode)?;
@@ -371,39 +405,5 @@ where
         .await
         .map(|_| ())
         .map_err(Into::into)
-    }
-}
-
-#[cfg(test)]
-#[allow(
-    clippy::missing_panics_doc,
-    reason = "Panics simply indicate failed tests."
-)]
-#[allow(clippy::unwrap_used, reason = "Panics simply indicate failed tests.")]
-mod tests {
-    use super::*;
-    use crate::encode::json::Json;
-    use serde::{Deserialize, Serialize};
-
-    #[tokio::test]
-    async fn cat_aas() {
-        #[derive(Clone, Debug, Serialize, Deserialize)]
-        struct Cat {
-            id: String,
-            tags: Vec<String>,
-            created_at: String,
-            url: String,
-            mimetype: String,
-        }
-
-        // Endpoint: `https://cataas.com/cat?json=true`.
-
-        let mut rest = Builder::new()
-            .source_url("https://cataas.com/cat")
-            .unwrap()
-            .decoder(Json)
-            .build();
-
-        let _cat: Cat = rest.fetch_one([("json", "true")]).await.unwrap();
     }
 }

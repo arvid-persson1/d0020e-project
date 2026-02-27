@@ -113,7 +113,13 @@ pub enum FetchError {
 /// Errors that may occur when fetching a single entry. Created by
 /// [`Source::fetch_one`](crate::connector::Source::fetch_one).
 #[derive(Debug, Error, Transitive)]
+#[expect(
+    clippy::duplicated_attributes,
+    reason = "False positives with `transitive`."
+)]
 #[transitive(from(ReqwestError, FetchError))]
+#[transitive(from(DecodeStreamError, FetchError))]
+#[transitive(from(DecodeError, FetchError))]
 pub enum FetchOneError {
     /// Error occured during fetching.
     #[error(transparent)]
