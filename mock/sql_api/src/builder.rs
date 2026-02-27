@@ -5,9 +5,12 @@ use axum::{
     routing::get,
 };
 
-use crate::{db::{DbConnection, DbPool}, models::BookSearch};
 use crate::models::Book;
 use crate::schema::books as schema_books;
+use crate::{
+    db::{DbConnection, DbPool},
+    models::BookSearch,
+};
 use diesel::prelude::*;
 use diesel::result::Error;
 /// Fetches a list of all books.
@@ -19,7 +22,7 @@ pub(crate) async fn get_books(
     State(pool): State<DbPool>,
     Query(params): Query<BookSearch>,
 ) -> Result<Json<Vec<Book>>, (StatusCode, String)> {
-    use schema_books::dsl::{books, isbn, title, author, format};
+    use schema_books::dsl::{author, books, format, isbn, title};
 
     let mut connection: DbConnection = pool.get().map_err(|err| {
         (
@@ -31,22 +34,21 @@ pub(crate) async fn get_books(
     let mut query = books.into_boxed();
 
     if let Some(req_isbn) = params.isbn {
-      query = query.filter(isbn.eq(req_isbn));
+        query = query.filter(isbn.eq(req_isbn));
     }
 
-
     if let Some(req_title) = params.title {
-      let search_pattern = format!("%{req_title}%");
-      query = query.filter(title.ilike(search_pattern));
+        let search_pattern = format!("%{req_title}%");
+        query = query.filter(title.ilike(search_pattern));
     }
 
     if let Some(req_author) = params.author {
-      let search_pattern = format!("%{req_author}%");
-      query = query.filter(author.ilike(search_pattern));
+        let search_pattern = format!("%{req_author}%");
+        query = query.filter(author.ilike(search_pattern));
     }
 
     if let Some(req_format) = params.format {
-      query = query.filter(format.eq(req_format));
+        query = query.filter(format.eq(req_format));
     }
 
     let res = query
@@ -65,7 +67,7 @@ pub(crate) async fn get_book(
     State(pool): State<DbPool>,
     Query(params): Query<BookSearch>,
 ) -> Result<Json<Book>, (StatusCode, String)> {
-    use schema_books::dsl::{books, title, isbn, author, format};
+    use schema_books::dsl::{author, books, format, isbn, title};
 
     let mut connection: DbConnection = pool.get().map_err(|err| {
         (
@@ -77,21 +79,21 @@ pub(crate) async fn get_book(
     let mut query = books.into_boxed();
 
     if let Some(req_isbn) = params.isbn {
-      query = query.filter(isbn.eq(req_isbn));
+        query = query.filter(isbn.eq(req_isbn));
     }
 
     if let Some(req_title) = params.title {
-      let search_pattern = format!("%{req_title}%");
-      query = query.filter(title.ilike(search_pattern));
+        let search_pattern = format!("%{req_title}%");
+        query = query.filter(title.ilike(search_pattern));
     }
 
     if let Some(req_author) = params.author {
-      let search_pattern = format!("%{req_author}%");
-      query = query.filter(author.ilike(search_pattern));
+        let search_pattern = format!("%{req_author}%");
+        query = query.filter(author.ilike(search_pattern));
     }
 
     if let Some(req_format) = params.format {
-      query = query.filter(format.eq(req_format));
+        query = query.filter(format.eq(req_format));
     }
 
     let res = query.first::<Book>(&mut connection);
@@ -99,13 +101,10 @@ pub(crate) async fn get_book(
     println!("--> HANDLER: get_book was called!");
 
     match res {
-      Ok(book) => Ok(Json(book)),
-      Err(Error::NotFound) => {
-        Err((StatusCode::NOT_FOUND, "Could not find book".to_owned()))
-      }
-    Err(err) => Err((StatusCode::INTERNAL_SERVER_ERROR, err.to_string())),
+        Ok(book) => Ok(Json(book)),
+        Err(Error::NotFound) => Err((StatusCode::NOT_FOUND, "Could not find book".to_owned())),
+        Err(err) => Err((StatusCode::INTERNAL_SERVER_ERROR, err.to_string())),
     }
-
 }
 /// Builder function for the Router app.
 pub(crate) fn build_app(pool: DbPool) -> Router {
