@@ -71,7 +71,7 @@ async fn books_test() {
         .clone()
         .oneshot(
             Request::builder()
-                .uri("/books/9780316497541")
+                .uri("/book?isbn=9780316497541")
                 .body(Body::empty())
                 .expect("Failed to build list request"),
         )
@@ -97,7 +97,7 @@ async fn books_test() {
         .clone()
         .oneshot(
             Request::builder()
-          .uri("/books/0000000000000") // This ISBN does not exist
+          .uri("/book?isbn=0000000000000") // This ISBN does not exist
           .body(Body::empty())
           .expect("Failed to build request"),
         )
@@ -105,6 +105,8 @@ async fn books_test() {
         .expect("Request failed");
 
     assert_eq!(response404.status(), StatusCode::NOT_FOUND);
+
+    // Test 4: Empty list scenario
 
     // Manually clears the database contents.
     {

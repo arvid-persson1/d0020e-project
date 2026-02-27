@@ -23,6 +23,22 @@ pub(crate) enum BookFormatType {
     /// Format for Paperback
     #[db_rename = "Paperback"]
     Paperback,
+    /// Pocket edition (PE)
+    #[db_rename = "Pocket"]
+    Pocket,
+}
+
+///Struct for book query search parameters
+#[derive(Deserialize)]
+pub(crate) struct BookSearch {
+    /// Isbn query parameter
+    pub(crate) isbn: Option<String>,
+    /// Title query parameter
+    pub(crate) title: Option<String>,
+    /// Author query parameter
+    pub(crate) author: Option<String>,
+    /// Format query parameter.
+    pub(crate) format: Option<BookFormatType>,
 }
 
 #[derive(Queryable, Selectable, Serialize, Deserialize, Debug, Clone)]
@@ -32,13 +48,13 @@ pub(crate) enum BookFormatType {
 /// The Book type
 pub(crate) struct Book {
     /// The book title
-    title: String,
+    pub(crate) title: String,
     /// The book author
-    author: String,
+    pub(crate) author: String,
     /// The book format
-    format: BookFormatType,
+    pub(crate) format: BookFormatType,
     /// The book isbn
-    isbn: String,
+    pub(crate) isbn: String,
 }
 
 impl Book {
