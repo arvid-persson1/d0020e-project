@@ -16,7 +16,7 @@ rest = []
 workspace = true
 
 [workspace]
-members = ["demo", "mock/bookery", "mock/graphql-api", "mock/rest-api-axum", "query_macro"]
+members = ["demo", "mock/sql_api", "mock/bookery", "mock/graphql-api", "mock/rest-api-axum", "query_macro"]
 resolver = "3"
 
 [workspace.dependencies]

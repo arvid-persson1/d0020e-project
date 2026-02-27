@@ -1,6 +1,6 @@
 use axum::{
     Json, Router,
-    extract::{Path, Query, State},
+    extract::{Query, State},
     http::StatusCode,
     routing::get,
 };
@@ -100,8 +100,8 @@ pub(crate) async fn get_book(
 
     match res {
       Ok(book) => Ok(Json(book)),
-      Err(diesel::result::Error::NotFound) => {
-        Err((StatusCode::NOT_FOUND, "Could not find book".to_string()))
+      Err(Error::NotFound) => {
+        Err((StatusCode::NOT_FOUND, "Could not find book".to_owned()))
       }
     Err(err) => Err((StatusCode::INTERNAL_SERVER_ERROR, err.to_string())),
     }
@@ -111,6 +111,6 @@ pub(crate) async fn get_book(
 pub(crate) fn build_app(pool: DbPool) -> Router {
     Router::<DbPool>::new()
         .route("/books", get(get_books))
-        .route("/books/{isbn}", get(get_book))
+        .route("/book", get(get_book))
         .with_state(pool)
 }

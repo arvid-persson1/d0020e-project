@@ -24,6 +24,7 @@ pub(crate) enum BookFormatType {
     #[db_rename = "Paperback"]
     Paperback,
     /// Pocket edition (PE)
+    #[db_rename = "Pocket"]
     Pocket,
 }
 
