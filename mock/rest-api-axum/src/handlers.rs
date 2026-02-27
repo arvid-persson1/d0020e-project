@@ -1,5 +1,5 @@
 use axum::{
-    extract::{Path, State},
+    extract::{Query, State},
     http::StatusCode,
     response::IntoResponse,
 };
@@ -10,9 +10,9 @@ use axum_serde::Xml;
 
 use std::sync::{Arc, Mutex};
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 /// Type for the supported book formats
-enum BookFormatType {
+pub(crate) enum BookFormatType {
     /// Format for PDF
     Pdf,
     /// Format for docx (Word)
@@ -23,6 +23,21 @@ enum BookFormatType {
     Hardcover,
     /// Format for Paperback
     Paperback,
+    /// Pocket edition
+    Pocket,
+}
+
+///Struct for book query search parameters
+#[derive(Deserialize)]
+pub(crate) struct BookSearch {
+    /// Isbn query parameter
+    isbn: Option<String>,
+    /// Title query parameter
+    title: Option<String>,
+    /// Author query parameter
+    author: Option<String>,
+    /// Format query parameter.
+    format: Option<BookFormatType>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -30,25 +45,13 @@ enum BookFormatType {
 /// The Book type
 pub(crate) struct Book {
     /// The book title
-    title: String,
+    pub(crate) title: String,
     /// The book author
-    author: String,
+    pub(crate) author: String,
     /// The book format
-    format: BookFormatType,
+    pub(crate) format: BookFormatType,
     /// The book isbn
-    isbn: String,
-}
-
-impl Book {
-    // This function only compiles when running 'cargo test'
-    #[cfg(test)]
-    pub(crate) fn get_title(&self) -> &str {
-        &self.title
-    }
-    #[cfg(test)]
-    pub(crate) fn get_isbn(&self) -> &str {
-        &self.isbn
-    }
+    pub(crate) isbn: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -75,18 +78,40 @@ pub(crate) struct AppState {
 #[inline]
 pub(crate) async fn get_books(
     State(state): State<Arc<AppState>>,
+    Query(params): Query<BookSearch>,
 ) -> Result<impl IntoResponse, StatusCode> {
-    // map_err catches the "poison" error and converts it to a 500 code
-    let books_vector = state
-        .books
-        .lock()
-        .map_err(|_err| StatusCode::INTERNAL_SERVER_ERROR)?
-        .clone();
+    let filtered_books = {
+        let books = state.books.lock().map_err(|e| {
+            eprintln!("Internal Error: Mutex was poisoned: {e}");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
 
-    // We wrap the response in BookList to satisfy the XML root element requirement
-    Ok(Xml(BookList {
-        books: books_vector,
-    }))
+        books
+            .iter()
+            .filter(|book| {
+                let match_author = params
+                    .author
+                    .as_ref()
+                    .is_none_or(|q| book.author.contains(q));
+
+                let match_title = params.title.as_ref().is_none_or(|q| book.title.contains(q));
+
+                let match_isbn = params.isbn.as_ref().is_none_or(|q| book.isbn == *q);
+
+                let match_format = params.format.as_ref().is_none_or(|q| book.format == *q);
+
+                match_author && match_title && match_isbn && match_format
+            })
+            .cloned()
+            .collect::<Vec<Book>>()
+    };
+
+    Ok((
+        StatusCode::OK,
+        Xml(BookList {
+            books: filtered_books,
+        }),
+    ))
 }
 
 /// Fetches a book by isbn (id)
@@ -98,22 +123,28 @@ pub(crate) async fn get_books(
 #[inline]
 pub(crate) async fn get_book(
     State(state): State<Arc<AppState>>,
-    Path(isbn): Path<String>,
-) -> impl IntoResponse {
+    Query(params): Query<BookSearch>,
+) -> Result<impl IntoResponse, StatusCode> {
     let book_option = {
-        // If the lock fails, this returns Err(500) immediately.
         let books_guard = state
             .books
             .lock()
             .map_err(|_err| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-        books_guard.iter().find(|b| b.isbn == isbn).cloned()
+        books_guard
+            .iter()
+            .find(|book| {
+                let matches_isbn = params.isbn.as_ref().is_none_or(|q| q == &book.isbn);
+                let matches_author = params.author.as_ref().is_none_or(|q| q == &book.author);
+                let matches_title = params.title.as_ref().is_none_or(|q| q == &book.title);
+                let matches_format = params.format.as_ref().is_none_or(|q| q == &book.format);
+
+                matches_isbn && matches_author && matches_title && matches_format
+            })
+            .cloned()
     };
 
-    book_option.map_or(
-        Err(StatusCode::NOT_FOUND), // If None (Not Found)
-        |book| Ok(Xml(book)),       // If Some (Found)
-    )
+    book_option.map_or(Err(StatusCode::NOT_FOUND), |book| Ok(Xml(book)))
 }
 
 /// Creates a new book
@@ -128,19 +159,15 @@ pub(crate) async fn get_book(
 pub(crate) async fn add_book(
     State(state): State<Arc<AppState>>,
     Xml(new_book): Xml<Book>,
-) -> impl IntoResponse {
-    state.books.lock().map_or_else(
-        |_| {
-            // The Mutex is poisoned (another thread panicked while holding it).
-            // We log the error (optional) and return a 500 error to the client.
-            eprintln!("ERROR: Mutex is poisoned!");
-            Err(StatusCode::INTERNAL_SERVER_ERROR)
-        },
-        |mut books_guard| {
-            // Success! We have the guard.
-            books_guard.push(new_book.clone());
-            // Return the success tuple wrapped in Ok()
-            Ok((StatusCode::CREATED, Xml(new_book)))
-        },
-    )
+) -> Result<impl IntoResponse, StatusCode> {
+    state
+        .books
+        .lock()
+        .map_err(|_err| {
+            eprintln!("ERROR: Mutex poisoned while creating book");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?
+        .push(new_book.clone());
+
+    Ok((StatusCode::CREATED, Xml(new_book)))
 }

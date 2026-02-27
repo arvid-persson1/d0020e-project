@@ -30,7 +30,6 @@ use thiserror::Error;
 #[derive(Clone, Debug)]
 pub struct Builder<
     T,
-    Q,
     E = !,
     D = !,
     C = !,
@@ -62,25 +61,25 @@ pub struct Builder<
     /// The [`Client`] to use when making requests.
     // INVARIANT: `client.is_some() == CLIENT`.
     client: Option<Client>,
-    /// The [encoder](Encode) to use when sending data.
+    /// The [encoder](crate::Encode) to use when sending data.
     // INVARIANT: `encoder.is_some() == ENCODER`.
     encoder: Option<E>,
-    /// The [decoder](Decode) to use when fetching data.
+    /// The [decoder](crate::Decode) to use when fetching data.
     // INVARIANT: `decoder.is_some() == DECODER`.
     decoder: Option<D>,
-    /// The combined [encoder](Encode) and [decoder](Decode) to use when sending and fetching data
-    /// respestively.
+    /// The combined [encoder](crate::Encode) and [decoder](crate::Decode) to use when sending and
+    /// fetching data respestively.
     // INVARIANT: `combined.is_some() == COMBINED`.
     // INVARIANT: `!(combined.is_some() && encoder.is_some())`.
     // INVARIANT: `!(combined.is_some() && decoder.is_some())`.
     combined: Option<C>,
-    /// Satisfies missing fields using `T` and `Q`.
+    /// Satisfies missing fields using `T`.
     // TODO: This may be overly restrictive when considering variance. Improve using unstable
     // `phantom_variance_markers` (#135806)?
-    _phantom: PhantomData<(T, Q)>,
+    _phantom: PhantomData<T>,
 }
 
-impl<T, Q> Builder<T, Q> {
+impl<T> Builder<T> {
     /// Construct a [`Builder`] with no fields set.
     #[must_use]
     #[inline]
@@ -99,7 +98,7 @@ impl<T, Q> Builder<T, Q> {
     }
 }
 
-impl<T, Q> Default for Builder<T, Q> {
+impl<T> Default for Builder<T> {
     #[inline]
     fn default() -> Self {
         Self::new()
@@ -113,7 +112,6 @@ pub struct InvalidUrl;
 
 impl<
     T,
-    Q,
     E,
     D,
     C,
@@ -127,7 +125,6 @@ impl<
 >
     Builder<
         T,
-        Q,
         E,
         D,
         C,
@@ -158,7 +155,6 @@ impl<
     ) -> Result<
         Builder<
             T,
-            Q,
             E,
             D,
             C,
@@ -182,7 +178,6 @@ impl<
 
 impl<
     T,
-    Q,
     E,
     D,
     C,
@@ -196,7 +191,6 @@ impl<
 >
     Builder<
         T,
-        Q,
         E,
         D,
         C,
@@ -217,7 +211,6 @@ impl<
         method: Method,
     ) -> Builder<
         T,
-        Q,
         E,
         D,
         C,
@@ -239,7 +232,6 @@ impl<
 
 impl<
     T,
-    Q,
     E,
     D,
     C,
@@ -253,7 +245,6 @@ impl<
 >
     Builder<
         T,
-        Q,
         E,
         D,
         C,
@@ -284,7 +275,6 @@ impl<
     ) -> Result<
         Builder<
             T,
-            Q,
             E,
             D,
             C,
@@ -308,7 +298,6 @@ impl<
 
 impl<
     T,
-    Q,
     E,
     D,
     C,
@@ -322,7 +311,6 @@ impl<
 >
     Builder<
         T,
-        Q,
         E,
         D,
         C,
@@ -343,7 +331,6 @@ impl<
         method: Method,
     ) -> Builder<
         T,
-        Q,
         E,
         D,
         C,
@@ -365,7 +352,6 @@ impl<
 
 impl<
     T,
-    Q,
     E,
     D,
     C,
@@ -379,7 +365,6 @@ impl<
 >
     Builder<
         T,
-        Q,
         E,
         D,
         C,
@@ -400,7 +385,6 @@ impl<
         client: Client,
     ) -> Builder<
         T,
-        Q,
         E,
         D,
         C,
@@ -422,7 +406,6 @@ impl<
 
 impl<
     T,
-    Q,
     D,
     C,
     const SOURCE_URL: bool,
@@ -434,7 +417,6 @@ impl<
 >
     Builder<
         T,
-        Q,
         !,
         D,
         C,
@@ -460,7 +442,6 @@ impl<
         encoder: E,
     ) -> Builder<
         T,
-        Q,
         E,
         D,
         C,
@@ -483,7 +464,6 @@ impl<
 
 impl<
     T,
-    Q,
     E,
     C,
     const SOURCE_URL: bool,
@@ -495,7 +475,6 @@ impl<
 >
     Builder<
         T,
-        Q,
         E,
         !,
         C,
@@ -521,7 +500,6 @@ impl<
         decoder: D,
     ) -> Builder<
         T,
-        Q,
         E,
         D,
         C,
@@ -544,7 +522,6 @@ impl<
 
 impl<
     T,
-    Q,
     const SOURCE_URL: bool,
     const SOURCE_METHOD: bool,
     const SINK_URL: bool,
@@ -553,7 +530,6 @@ impl<
 >
     Builder<
         T,
-        Q,
         !,
         !,
         !,
@@ -579,7 +555,6 @@ impl<
         codec: C,
     ) -> Builder<
         T,
-        Q,
         !,
         !,
         Codec<T, !, !, C>,
@@ -614,10 +589,10 @@ pub trait Build {
 }
 
 // `source_url` and `decoder` set: `ReadOnly`.
-impl<T, Q, D, const SOURCE_METHOD: bool, const CLIENT: bool> Build
-    for Builder<T, Q, !, D, !, true, SOURCE_METHOD, false, false, CLIENT, false, true, false>
+impl<T, D, const SOURCE_METHOD: bool, const CLIENT: bool> Build
+    for Builder<T, !, D, !, true, SOURCE_METHOD, false, false, CLIENT, false, true, false>
 {
-    type Output = ReadOnly<T, Q, D>;
+    type Output = ReadOnly<T, D>;
 
     #[expect(clippy::unreachable, reason = "Invariants guarantee correctness.")]
     #[inline]
@@ -644,8 +619,8 @@ impl<T, Q, D, const SOURCE_METHOD: bool, const CLIENT: bool> Build
 }
 
 // `sink_url` and `encoder` set: `WriteOnly`.
-impl<T, Q, E, const SINK_METHOD: bool, const CLIENT: bool> Build
-    for Builder<T, Q, E, !, !, false, false, true, SINK_METHOD, CLIENT, true, false, false>
+impl<T, E, const SINK_METHOD: bool, const CLIENT: bool> Build
+    for Builder<T, E, !, !, false, false, true, SINK_METHOD, CLIENT, true, false, false>
 {
     type Output = WriteOnly<T, E>;
 
@@ -674,10 +649,10 @@ impl<T, Q, E, const SINK_METHOD: bool, const CLIENT: bool> Build
 }
 
 // `source_url`, `sink_url`, `encoder` and `decoder` set: `ReadWrite`.
-impl<T, Q, E, D, const SOURCE_METHOD: bool, const SINK_METHOD: bool, const CLIENT: bool> Build
-    for Builder<T, Q, E, D, !, true, SOURCE_METHOD, true, SINK_METHOD, CLIENT, true, true, false>
+impl<T, E, D, const SOURCE_METHOD: bool, const SINK_METHOD: bool, const CLIENT: bool> Build
+    for Builder<T, E, D, !, true, SOURCE_METHOD, true, SINK_METHOD, CLIENT, true, true, false>
 {
-    type Output = ReadWrite<T, Q, E, D, !>;
+    type Output = ReadWrite<T, E, D, !>;
 
     #[expect(clippy::unreachable, reason = "Invariants guarantee correctness.")]
     #[inline]
@@ -710,10 +685,10 @@ impl<T, Q, E, D, const SOURCE_METHOD: bool, const SINK_METHOD: bool, const CLIEN
 }
 
 // `source_url`, `sink_url`, and `combined` set: `ReadWrite`.
-impl<T, Q, C, const SOURCE_METHOD: bool, const SINK_METHOD: bool, const CLIENT: bool> Build
-    for Builder<T, Q, !, !, C, true, SOURCE_METHOD, true, SINK_METHOD, CLIENT, false, false, true>
+impl<T, C, const SOURCE_METHOD: bool, const SINK_METHOD: bool, const CLIENT: bool> Build
+    for Builder<T, !, !, C, true, SOURCE_METHOD, true, SINK_METHOD, CLIENT, false, false, true>
 {
-    type Output = ReadWrite<T, Q, !, !, C>;
+    type Output = ReadWrite<T, !, !, C>;
 
     #[expect(clippy::unreachable, reason = "Invariants guarantee correctness.")]
     #[inline]

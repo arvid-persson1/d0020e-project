@@ -25,21 +25,12 @@ async fn spawn_app() -> SocketAddr {
     addrs
 }
 
-fn get_book1() -> &'static str {
+fn get_new_book() -> &'static str {
     "<book>
-    <title>Nineteen Eighty-Four</title>
-    <author>George Orwell</author>
+    <title>Gallows Raging Fame</title>
+    <author>Reighly Poams</author>
     <format>Hardcover</format>
-    <isbn>9780198185215</isbn>
-  </book>"
-}
-
-fn get_book2() -> &'static str {
-    "<book>
-    <title>The Last Wish: Introducing the Witcher</title>
-    <author>Andrzej Sapkowski</author>
-    <format>Hardcover</format>
-    <isbn>9780316497541</isbn>
+    <isbn>1234567890123</isbn>
   </book>"
 }
 
@@ -51,90 +42,71 @@ async fn book_test() {
     let addrs = spawn_app().await;
     let client = reqwest::Client::new();
 
-    let test_data = get_book1();
+    let new_book = get_new_book();
 
-    let post_reqst = client
+    let post_res = client
         .post(format!("http://{addrs}/books"))
         .header(CONTENT_TYPE, "application/xml")
-        .body(test_data)
+        .body(new_book)
         .send()
         .await
         .expect("Failed to send request");
 
-    let status1 = post_reqst.status();
+    let post_status = post_res.status();
 
-    assert_eq!(status1, 201);
+    println!("The post status: {post_status}");
 
-    let body1 = post_reqst
-        .text()
-        .await
-        .expect("Failed to retrieve response text");
+    assert_eq!(post_status, 201); // Created
 
-    assert!(body1.contains("<title>Nineteen Eighty-Four</title>"));
-    assert!(body1.contains("<isbn>9780198185215</isbn>"));
-
-    let other_test_data = get_book2();
-
-    let other_post_reqst = client
-        .post(format!("http://{addrs}/books"))
-        .header(CONTENT_TYPE, "application/xml")
-        .body(other_test_data)
+    // Search by Author (Sapkowski)
+    let search_author = client
+        .get(format!("http://{addrs}/books?author=Andrzej+Sapkowski"))
         .send()
         .await
-        .expect("Failed to send request");
+        .expect("Failed to send author request");
 
-    let status2 = other_post_reqst.status();
-    assert_eq!(status2, 201);
+    assert_eq!(search_author.status(), 200);
 
-    let body2 = other_post_reqst
-        .text()
-        .await
-        .expect("Failed to retrieve response text");
-    assert!(body2.contains("<title>The Last Wish: Introducing the Witcher</title>"));
-    assert!(body2.contains("<isbn>9780316497541</isbn>"));
+    let body_author = search_author.text().await.expect("Failed to get text");
+    // Verify we found the pre-filled book
+    assert!(body_author.contains("The Last Wish: Introducing the Witcher"));
+    assert!(body_author.contains("Andrzej Sapkowski"));
 
-    let isbn_target = "9780316497541";
-
-    let get_reqst = client
-        .get(format!("http://{addrs}/books/{isbn_target}"))
+    let search_isbn = client
+        .get(format!("http://{addrs}/books?isbn=9780316497541"))
         .send()
         .await
-        .expect("Failed to send request");
+        .expect("Failed to send isbn request");
 
-    let status3 = get_reqst.status();
+    assert_eq!(search_isbn.status(), 200);
+    let body_isbn = search_isbn.text().await.expect("Failed to get text");
+    assert!(body_isbn.contains("9780316497541"));
 
-    assert_eq!(status3, 200);
-
-    let body3 = get_reqst
-        .text()
-        .await
-        .expect("Failed to retrieve response text");
-
-    assert!(body3.contains("<title>The Last Wish: Introducing the Witcher</title>"));
-    assert!(body3.contains("<isbn>9780316497541</isbn>"));
-
-    let get_list_reqst = client
+    // --- TEST 4: FETCH ALL BOOKS ---
+    let list_res = client
         .get(format!("http://{addrs}/books"))
         .send()
         .await
-        .expect("Failed to send request");
+        .expect("Failed to get list");
 
-    let status4 = get_list_reqst.status();
+    assert_eq!(list_res.status(), 200);
 
-    assert_eq!(status4, 200);
+    let body_list = list_res.text().await.expect("Failed to get text");
+    // Parse the list to check contents
+    let book_list: BookList = from_str(&body_list).expect("Failed to parse response");
 
-    let body4 = get_list_reqst
-        .text()
-        .await
-        .expect("Failed to retrieve response text");
-    let book_list: BookList = from_str(&body4).expect("Failed to parse the response");
+    // We expect 5 books now (4 pre-filled + 1 added)
+    assert_eq!(book_list.books.len(), 5);
 
-    assert_eq!(book_list.books[0].get_title(), "Nineteen Eighty-Four");
-    assert_eq!(book_list.books[0].get_isbn(), "9780198185215");
+    let found_sapkowski = book_list
+        .books
+        .iter()
+        .any(|b| b.title == "The Last Wish: Introducing the Witcher");
+    assert!(found_sapkowski, "List should contain pre-filled data");
 
-    assert_eq!(
-        book_list.books[1].get_title(),
-        "The Last Wish: Introducing the Witcher"
-    );
-    assert_eq!(book_list.books[1].get_isbn(), "9780316497541");
+    let found_new_book = book_list
+        .books
+        .iter()
+        .any(|b| b.title == "Gallows Raging Fame");
+    assert!(found_new_book, "List should contain the posted book");
 }
