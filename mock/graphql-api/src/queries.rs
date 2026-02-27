@@ -1,6 +1,6 @@
 //! This might be a missleading name, but all it's just a file that contains the different ways you interact via GraphQL e.g mutations or queries.
 use crate::{
-    book_schema::{Book, BookInput, FilteredBook},
+    book_schema::{Book, FilteredBookInput},
     db::Db,
 };
 use async_graphql::{Object, Result};
@@ -25,7 +25,7 @@ impl Query {
     ///         isbn
     ///     }
     /// }
-    async fn get_books(&self, filter: FilteredBook) -> Vec<Book> {
+    async fn get_books(&self, filter: FilteredBookInput) -> Vec<Book> {
         self.db.get_books(filter).await
     }
 
@@ -68,7 +68,7 @@ impl Mutation {
     /// }
     /// # Errors
     /// Returns an error if any of the books couldn't be inserted properly
-    async fn insert_book(&self, book: BookInput) -> Result<Book> {
+    async fn insert_book(&self, book: FilteredBookInput) -> Result<Book> {
         // Book is shadowed here since we want values to return aswell.
         let book = self.db.insert_book(book).await?;
         // Convert to book since that's the actual object
@@ -93,7 +93,7 @@ impl Mutation {
     /// }
     /// # Errors
     /// Returns error if the book didn't insert properly
-    async fn insert_books(&self, books: Vec<BookInput>) -> Result<Vec<Book>> {
+    async fn insert_books(&self, books: Vec<FilteredBookInput>) -> Result<Vec<Book>> {
         let mut inserted = vec![];
 
         for book in books {

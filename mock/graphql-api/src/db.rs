@@ -1,5 +1,5 @@
 //! A file containing all functions that are needed for the database
-use crate::book_schema::{Book, BookInput, FilteredBook};
+use crate::book_schema::{Book, FilteredBookInput};
 use sqlx::sqlite::SqlitePool;
 
 /// A struct representing the database
@@ -47,7 +47,7 @@ impl Db {
 
     /// A query that returns an array of books matching the input.
     // NOTE: sqlx just removes the Some and looks for the values instead.
-    pub(crate) async fn get_books(&self, filter: FilteredBook) -> Vec<Book> {
+    pub(crate) async fn get_books(&self, filter: FilteredBookInput) -> Vec<Book> {
         // This is the fastest way I came up with in a short time.
         sqlx::query_as::<_, Book>(
             "SELECT isbn, title, author, format FROM book 
@@ -68,7 +68,7 @@ impl Db {
     /// Adds a book to the database, also returns the resulting book if it worked out
     /// # Errors
     /// Returns an error if the query didn't execute properly.
-    pub(crate) async fn insert_book(&self, book: BookInput) -> Result<Book, String> {
+    pub(crate) async fn insert_book(&self, book: FilteredBookInput) -> Result<Book, String> {
         // Note that we don't want the query result since all we're doing is inserting
         let _ = sqlx::query("INSERT INTO book (isbn, title, author, format) VALUES (?, ?, ?, ?)")
             .bind(&book.isbn)
@@ -81,10 +81,10 @@ impl Db {
 
         // Return the input as a `Book` if everything worked out.
         Ok(Book {
-            isbn: book.isbn,
-            title: book.title,
-            author: book.author,
-            format: book.format,
+            isbn: book.isbn.expect("Somehow there was no value"),
+            title: book.title.expect("Somehow there was no value"),
+            author: book.author.expect("Somehow there was no value"),
+            format: book.format.expect("Somehow there was no value"),
         })
     }
 }
