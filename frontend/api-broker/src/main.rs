@@ -14,10 +14,12 @@ use broker::{
     encode::json::Json as BrokerJson,
     encode::xml::Xml,
     query::Queryable,
+    query::combinators::True,
     rest::{Build as _, Builder as RestBuilder},
 };
 use serde::{Deserialize, Serialize};
 use sqlx::{FromRow, SqlitePool};
+use std::collections::HashSet;
 use std::sync::Arc;
 use tokio::{net::TcpListener, sync::Mutex};
 use tower_http::cors::{Any, CorsLayer};
@@ -33,15 +35,26 @@ struct AppState {
 
 /// Incoming JSON payload for `/query`.
 #[derive(Deserialize)]
-struct QueryRequest {
+struct QueryCondition {
     /// Field to search by: `author`, `title`, or `isbn`.
     field: String,
     /// Value to match.
     value: String,
 }
 
+/// Request body for the `/query` endpoint.
+#[derive(Deserialize)]
+struct QueryRequest {
+    /// List of conditions to apply.
+    conditions: Vec<QueryCondition>,
+    /// Logical operator used to combine conditions:
+    /// `"and"` requires all conditions to match,
+    /// `"or"` requires at least one.
+    operator: String,
+}
+
 /// Representation of a book.
-#[derive(Debug, Deserialize, Serialize, PartialEq, Eq, Hash, Queryable, FromRow)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Eq, Hash, Queryable, FromRow, Clone)]
 struct Book {
     /// Book title.
     title: String,
@@ -125,37 +138,79 @@ async fn main() {
         .expect("Failed to start HTTP server");
 }
 
-/// Handles POST `/query` by fetching from broker + local DB.
+/// Handles POST `/query`.
+///
+/// # Errors
+///
+/// Returns:
+/// - `400 BAD REQUEST` if the request is invalid.
+/// - `500 INTERNAL SERVER ERROR` if database access fails.
 async fn query_handler(
     State(state): State<AppState>,
     AxumJson(payload): AxumJson<QueryRequest>,
-) -> impl IntoResponse {
-    // Build broker query
-    let query = match payload.field.as_str() {
-        "author" => Book::author().eq(&payload.value),
-        "title" => Book::title().eq(&payload.value),
-        "isbn" => Book::isbn().eq(&payload.value),
-        _ => return (StatusCode::BAD_REQUEST, AxumJson(Vec::<Book>::new())).into_response(),
-    };
-
+) -> Result<AxumJson<Vec<Book>>, StatusCode> {
+    // Get all broker books
     let mut results = {
         let mut broker = state.broker.lock().await;
-        broker.fetch_all(&query).await.unwrap_or_default()
+        broker.fetch_all(&True).await.unwrap_or_default()
     };
 
-    // Fetch from SQLite
-    let db_books = sqlx::query_as::<_, Book>(&format!(
-        "SELECT title, author, isbn FROM books WHERE {} = ?",
-        payload.field
-    ))
-    .bind(&payload.value)
-    .fetch_all(&state.db)
-    .await
-    .unwrap_or_default();
+    // Get all SQLite books
+    let db_books = sqlx::query_as::<_, Book>("SELECT title, author, isbn FROM books")
+        .fetch_all(&state.db)
+        .await
+        .unwrap_or_default();
 
     results.extend(db_books);
 
-    (StatusCode::OK, AxumJson(results)).into_response()
+    // Deduplicate
+    let mut seen: HashSet<Book> = HashSet::new();
+    results.retain(|b| seen.insert(b.clone()));
+
+    // Apply filtering locally
+    let filtered: Vec<Book> = results
+        .into_iter()
+        .filter(|book| match payload.operator.to_lowercase().as_str() {
+            "and" => payload
+                .conditions
+                .iter()
+                .all(|cond| match cond.field.as_str() {
+                    "author" => book
+                        .author
+                        .to_lowercase()
+                        .starts_with(&cond.value.to_lowercase()),
+                    "title" => book
+                        .title
+                        .to_lowercase()
+                        .starts_with(&cond.value.to_lowercase()),
+                    "isbn" => book
+                        .isbn
+                        .to_lowercase()
+                        .starts_with(&cond.value.to_lowercase()),
+                    _ => false,
+                }),
+            _ => payload
+                .conditions
+                .iter()
+                .any(|cond| match cond.field.as_str() {
+                    "author" => book
+                        .author
+                        .to_lowercase()
+                        .starts_with(&cond.value.to_lowercase()),
+                    "title" => book
+                        .title
+                        .to_lowercase()
+                        .starts_with(&cond.value.to_lowercase()),
+                    "isbn" => book
+                        .isbn
+                        .to_lowercase()
+                        .starts_with(&cond.value.to_lowercase()),
+                    _ => false,
+                }),
+        })
+        .collect();
+
+    Ok(AxumJson(filtered))
 }
 
 /// Handles POST `/books` by inserting a new book into `SQLite DB`.

@@ -1,13 +1,33 @@
 async function search() {
-    const field = document.getElementById("field").value;
-    const value = document.getElementById("value").value;
+    const operator = document.getElementById("operator").value;
+
+    const conditionElements = document.querySelectorAll("#conditions .condition");
+
+    const conditions = [];
+
+    conditionElements.forEach(cond => {
+        const field = cond.querySelector(".field").value;
+        const value = cond.querySelector(".value").value;
+
+        if (value.trim() !== "") {
+            conditions.push({ field, value });
+        }
+    });
+
+    if (conditions.length === 0) {
+        alert("Please enter at least one search condition.");
+        return;
+    }
 
     const response = await fetch("http://localhost:3000/query", {
         method: "POST",
         headers: {
             "Content-Type": "application/json"
         },
-        body: JSON.stringify({ field, value })
+        body: JSON.stringify({
+            operator,
+            conditions
+        })
     });
 
     const data = await response.json();
@@ -26,6 +46,26 @@ async function search() {
         resultsList.appendChild(li);
     });
 }
+
+function addCondition() {
+    const container = document.getElementById("conditions");
+
+    const div = document.createElement("div");
+    div.className = "condition";
+
+    div.innerHTML = `
+        <select class="field">
+            <option value="author">Author</option>
+            <option value="title">Title</option>
+            <option value="isbn">ISBN</option>
+        </select>
+
+        <input type="text" class="value" placeholder="Enter value" />
+    `;
+
+    container.appendChild(div);
+}
+
 
 document.getElementById("addBookForm").addEventListener("submit", async (e) => {
     e.preventDefault();

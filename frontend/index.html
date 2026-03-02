@@ -7,13 +7,26 @@
 <body>
 <h1>Book Search</h1>
 
-<select id="field">
-    <option value="author">Author</option>
-    <option value="title">Title</option>
-    <option value="isbn">ISBN</option>
+<div id="conditions">
+    <div class="condition">
+        <select class="field">
+            <option value="author">Author</option>
+            <option value="title">Title</option>
+            <option value="isbn">ISBN</option>
+        </select>
+
+        <input type="text" class="value" placeholder="Enter value" />
+    </div>
+</div>
+
+<br>
+
+<select id="operator">
+    <option value="and">AND</option>
+    <option value="or">OR</option>
 </select>
 
-<input type="text" id="value" placeholder="Enter value" />
+<button onclick="addCondition()">Add Condition</button>
 <button onclick="search()">Search</button>
 
 <h2>Add Book</h2>
