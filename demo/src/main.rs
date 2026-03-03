@@ -52,7 +52,9 @@ async fn main() {
     let mut broker = Broker::<Book>::new();
     println!("Instantiated broker.");
 
-    broker.add_source(Box::new(
+    broker.add_source(
+        "JSON API",
+        Box::new(
         RestBuilder::new()
             .source_url("http://127.0.0.1:8080/books")
             .expect("Failed to parse URL.")
@@ -60,7 +62,9 @@ async fn main() {
             .build(),
     ));
     println!("Registered source (REST endpoint on 127.0.0.1:8080).");
-    broker.add_source(Box::new(
+    broker.add_source(
+        "XML API",
+        Box::new(
         RestBuilder::new()
             .source_url("http://127.0.0.1:1616/books")
             .expect("Failed to parse URL.")

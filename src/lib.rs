@@ -15,6 +15,7 @@ use futures::{
     stream::{BoxStream, FuturesUnordered, select_all},
 };
 use std::{collections::HashSet, hash::Hash};
+use serde::Serialize;
 use tokio as _;
 
 pub mod errors;
@@ -33,12 +34,21 @@ pub mod rest;
 
 use connector::Source;
 
+/// struct for sending sourcename to frontend
+#[derive(Debug, Clone, Serialize)]
+pub struct SearchResult<T> {
+    /// Source as item
+    pub item: T,
+    /// Source as String
+    pub source: String,
+}
+
 /// The broker.
 #[expect(missing_debug_implementations, reason = "TODO")]
 pub struct Broker<T> {
     // TODO: Add names?
     /// Sources added to the broker.
-    sources: Vec<Box<dyn Source<T> + Send>>,
+    sources: Vec<(String, Box<dyn Source<T> + Send>)>,
 }
 
 impl<T> Broker<T>
@@ -56,8 +66,12 @@ where
 
     /// Add a source to the broker.
     #[inline]
-    pub fn add_source(&mut self, source: Box<dyn Source<T> + Send>) {
-        self.sources.push(source);
+    pub fn add_source(
+        &mut self,
+        name: impl Into<String>,
+        source: Box<dyn Source<T> + Send>,
+    ) {
+        self.sources.push((name.into(), source));
     }
 
     /// Fetch some data matching a query, selecting only up to a given amount for each source. In
@@ -78,7 +92,7 @@ where
         let mut futures = self
             .sources
             .iter_mut()
-            .map(|source| source.fetch(query))
+            .map(|source| source.1.fetch(query))
             .collect::<FuturesUnordered<_>>();
 
         while let Some(sample) = futures.next().await {
@@ -120,7 +134,7 @@ where
         let futures = self
             .sources
             .iter_mut()
-            .map(|source| source.fetch(query))
+            .map(|source| source.1.fetch(query))
             .collect::<Vec<_>>();
         try_join_all(futures)
             .await
@@ -132,14 +146,14 @@ where
         let min_capacity = self
             .sources
             .iter()
-            .map(|source| source.size_hint(query).0)
+            .map(|source| source.1.size_hint(query).0)
             .sum();
         let mut out = HashSet::with_capacity(min_capacity);
 
         for per_source in self
             .sources
             .iter_mut()
-            .map(|source| source.fetch_all(query))
+            .map(|source| source.1.fetch_all(query))
         {
             out.extend(per_source.await?);
         }
@@ -152,7 +166,7 @@ where
         let mut futures = self
             .sources
             .iter_mut()
-            .map(|source| source.fetch_one(query))
+            .map(|source| source.1.fetch_one(query))
             .collect::<FuturesUnordered<_>>();
 
         // TODO: Fix this messy code.
@@ -183,7 +197,7 @@ where
         let mut futures = self
             .sources
             .iter_mut()
-            .map(|source| source.fetch_optional(query))
+            .map(|source| source.1.fetch_optional(query))
             .collect::<FuturesUnordered<_>>();
 
         // TODO: Fix this messy code.
@@ -210,12 +224,45 @@ where
     fn size_hint(&self, query: &dyn Query<T>) -> (usize, Option<usize>) {
         self.sources
             .iter()
-            .map(|source| source.size_hint(query))
-            .reduce(|(lower_acc, upper_acc), (lower, upper)| {
+            .map(|source| source.1.size_hint(query))
+            .reduce(|(lower_acc, upper_acc): (_, _), (lower, upper)| {
                 let lower = lower_acc + lower;
-                let upper = upper_acc.zip(upper).and_then(|(a, b)| a.checked_add(b));
+                let upper = upper_acc.zip(upper).and_then(|(a, b): (_, _)| a.checked_add(b));
                 (lower, upper)
             })
             .unwrap_or_default()
+    }
+}
+
+impl<T> Broker<T>
+where
+    T: Send + Clone,
+{
+    /// Fetch all items from all registered sources, including their source name.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`FetchError`] if any underlying source fails to fetch
+    /// or decode its results.
+    #[inline]
+    pub async fn fetch_all_with_source(
+        &mut self,
+        query: &(dyn Query<T> + Sync),
+    ) -> Result<Vec<SearchResult<T>>, FetchError> {
+
+        let mut out = Vec::new();
+
+        for (name, source) in &mut self.sources {
+            let results = source.fetch_all(query).await?;
+
+            for item in results {
+                out.push(SearchResult {
+                    item,
+                    source: name.clone(),
+                });
+            }
+        }
+
+        Ok(out)
     }
 }

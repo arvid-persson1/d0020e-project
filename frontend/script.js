@@ -40,9 +40,10 @@ async function search() {
         return;
     }
 
-    data.forEach(book => {
+    data.forEach(result => {
         const li = document.createElement("li");
-        li.textContent = `"${book.title}" by ${book.author} (ISBN: ${book.isbn})`;
+        const book = result.item;
+        li.textContent = `"${book.title}" by ${book.author} (ISBN: ${book.isbn}) - Source: ${result.source}`;
         resultsList.appendChild(li);
     });
 }

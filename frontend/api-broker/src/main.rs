@@ -10,12 +10,12 @@ use axum::{
 };
 use broker::{
     Broker,
-    connector::Source as _,
     encode::json::Json as BrokerJson,
     encode::xml::Xml,
     query::Queryable,
     query::combinators::True,
     rest::{Build as _, Builder as RestBuilder},
+    SearchResult,
 };
 use serde::{Deserialize, Serialize};
 use sqlx::{FromRow, SqlitePool};
@@ -75,21 +75,25 @@ async fn main() {
     let mut broker = Broker::<Book>::new();
 
     // JSON source
-    broker.add_source(Box::new(
-        RestBuilder::new()
-            .source_url("http://127.0.0.1:8080/books")
-            .expect("Failed to create JSON broker source")
-            .decoder(BrokerJson)
-            .build(),
+    broker.add_source(
+        "JSON API",
+        Box::new(
+            RestBuilder::new()
+                .source_url("http://127.0.0.1:8080/books")
+                .expect("Failed to create JSON broker source")
+                .decoder(BrokerJson)
+                .build(),
     ));
 
     // XML source
-    broker.add_source(Box::new(
-        RestBuilder::new()
-            .source_url("http://127.0.0.1:1616/books")
-            .expect("Failed to create XML broker source")
-            .decoder(Xml)
-            .build(),
+    broker.add_source(
+        "XML API",
+        Box::new(
+            RestBuilder::new()
+                .source_url("http://127.0.0.1:1616/books")
+                .expect("Failed to create XML broker source")
+                .decoder(Xml)
+                .build(),
     ));
 
     let db = SqlitePool::connect("sqlite://./books.db")
@@ -148,11 +152,11 @@ async fn main() {
 async fn query_handler(
     State(state): State<AppState>,
     AxumJson(payload): AxumJson<QueryRequest>,
-) -> Result<AxumJson<Vec<Book>>, StatusCode> {
+) -> Result<AxumJson<Vec<SearchResult<Book>>>, StatusCode> {
     // Get all broker books
     let mut results = {
         let mut broker = state.broker.lock().await;
-        broker.fetch_all(&True).await.unwrap_or_default()
+        broker.fetch_all_with_source(&True).await.unwrap_or_default()
     };
 
     // Get all SQLite books
@@ -161,52 +165,61 @@ async fn query_handler(
         .await
         .unwrap_or_default();
 
-    results.extend(db_books);
+    for book in db_books {
+        results.push(SearchResult {
+            item: book,
+            source: "Local DB".to_owned(),
+        });
+    }
 
     // Deduplicate
     let mut seen: HashSet<Book> = HashSet::new();
-    results.retain(|b| seen.insert(b.clone()));
+    results.retain(|r| seen.insert(r.item.clone()));
 
     // Apply filtering locally
-    let filtered: Vec<Book> = results
+    let filtered: Vec<SearchResult<Book>> = results
         .into_iter()
-        .filter(|book| match payload.operator.to_lowercase().as_str() {
-            "and" => payload
-                .conditions
-                .iter()
-                .all(|cond| match cond.field.as_str() {
-                    "author" => book
-                        .author
-                        .to_lowercase()
-                        .starts_with(&cond.value.to_lowercase()),
-                    "title" => book
-                        .title
-                        .to_lowercase()
-                        .starts_with(&cond.value.to_lowercase()),
-                    "isbn" => book
-                        .isbn
-                        .to_lowercase()
-                        .starts_with(&cond.value.to_lowercase()),
-                    _ => false,
-                }),
-            _ => payload
-                .conditions
-                .iter()
-                .any(|cond| match cond.field.as_str() {
-                    "author" => book
-                        .author
-                        .to_lowercase()
-                        .starts_with(&cond.value.to_lowercase()),
-                    "title" => book
-                        .title
-                        .to_lowercase()
-                        .starts_with(&cond.value.to_lowercase()),
-                    "isbn" => book
-                        .isbn
-                        .to_lowercase()
-                        .starts_with(&cond.value.to_lowercase()),
-                    _ => false,
-                }),
+        .filter(|result| {
+            let book = &result.item;
+
+            match payload.operator.to_lowercase().as_str() {
+                "and" => payload
+                    .conditions
+                    .iter()
+                    .all(|cond| match cond.field.as_str() {
+                        "author" => book
+                            .author
+                            .to_lowercase()
+                            .starts_with(&cond.value.to_lowercase()),
+                        "title" => book
+                            .title
+                            .to_lowercase()
+                            .starts_with(&cond.value.to_lowercase()),
+                        "isbn" => book
+                            .isbn
+                            .to_lowercase()
+                            .starts_with(&cond.value.to_lowercase()),
+                        _ => false,
+                    }),
+                _ => payload
+                    .conditions
+                    .iter()
+                    .any(|cond| match cond.field.as_str() {
+                        "author" => book
+                            .author
+                            .to_lowercase()
+                            .starts_with(&cond.value.to_lowercase()),
+                        "title" => book
+                            .title
+                            .to_lowercase()
+                            .starts_with(&cond.value.to_lowercase()),
+                        "isbn" => book
+                            .isbn
+                            .to_lowercase()
+                            .starts_with(&cond.value.to_lowercase()),
+                        _ => false,
+                    }),
+            }
         })
         .collect();
 
