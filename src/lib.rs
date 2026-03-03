@@ -27,6 +27,9 @@ pub use query::Query;
 pub mod encode;
 pub use encode::{Codec, Decode, Encode};
 
+#[cfg(feature = "graphql")]
+pub mod graphql;
+
 #[cfg(feature = "rest")]
 pub mod rest;
 
