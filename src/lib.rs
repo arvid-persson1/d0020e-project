@@ -8,14 +8,17 @@
 // Currently, `tokio` is only used by tests. It will be used more later, so instead of making
 // it a test-only dependency for the time being, this is added temporarily to suppress warnings.
 // TODO: Remove.
+use crate::connector::Sink as _;
+use crate::errors::SendError;
 use async_trait::async_trait;
 use futures::{
     StreamExt as _,
     future::try_join_all,
     stream::{BoxStream, FuturesUnordered, select_all},
 };
-use std::{collections::HashSet, hash::Hash};
 use serde::Serialize;
+use std::any::Any;
+use std::{collections::HashSet, hash::Hash};
 use tokio as _;
 
 pub mod errors;
@@ -32,7 +35,33 @@ pub use encode::{Codec, Decode, Encode};
 #[cfg(feature = "rest")]
 pub mod rest;
 
+use crate::connector::MemorySource;
 use connector::Source;
+
+/// A trait for types that can accept and store data.
+///
+/// This extends [`Source`] so that writable sources can both
+/// provide and receive data.
+///
+/// Implementors typically represent connectors that support
+/// write operations (for example in-memory sources or REST
+/// endpoints that allow POST requests).
+#[async_trait]
+pub trait Sink<T: Send>: Source<T> {
+    /// Adds a single item to the sink.
+    ///
+    /// Returns an error if the item could not be stored.
+    async fn add(&mut self, item: T) -> Result<(), FetchError>;
+
+    /// Attempts to downcast this source to a sink.
+    ///
+    /// Returns `Some` if the underlying implementation supports
+    /// writing, otherwise `None`.
+    #[inline]
+    fn as_sink(&self) -> Option<&dyn Sink<T>> {
+        None
+    }
+}
 
 /// struct for sending sourcename to frontend
 #[derive(Debug, Clone, Serialize)]
@@ -66,11 +95,7 @@ where
 
     /// Add a source to the broker.
     #[inline]
-    pub fn add_source(
-        &mut self,
-        name: impl Into<String>,
-        source: Box<dyn Source<T> + Send>,
-    ) {
+    pub fn add_source(&mut self, name: impl Into<String>, source: Box<dyn Source<T> + Send>) {
         self.sources.push((name.into(), source));
     }
 
@@ -119,8 +144,13 @@ where
 #[async_trait]
 impl<T> Source<T> for Broker<T>
 where
-    T: Eq + Hash + Send,
+    T: Eq + Hash + Send + 'static,
 {
+    #[inline]
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
+    }
+
     #[inline]
     async fn fetch<'s>(
         &'s mut self,
@@ -227,7 +257,9 @@ where
             .map(|source| source.1.size_hint(query))
             .reduce(|(lower_acc, upper_acc): (_, _), (lower, upper)| {
                 let lower = lower_acc + lower;
-                let upper = upper_acc.zip(upper).and_then(|(a, b): (_, _)| a.checked_add(b));
+                let upper = upper_acc
+                    .zip(upper)
+                    .and_then(|(a, b): (_, _)| a.checked_add(b));
                 (lower, upper)
             })
             .unwrap_or_default()
@@ -236,8 +268,45 @@ where
 
 impl<T> Broker<T>
 where
-    T: Send + Clone,
+    T: Send + Sync + Clone + 'static,
 {
+    /// Returns all sources currently registered with the broker.
+    ///
+    /// Sources are returned as `(name, source)` pairs, where the
+    /// name uniquely identifies the source within the broker.
+    /// The returned slice is read-only and reflects the broker's
+    /// current in-memory state.
+    #[must_use]
+    #[inline]
+    pub fn sources(&self) -> &[(String, Box<dyn Source<T> + Send>)] {
+        &self.sources
+    }
+
+    /// Adds an item to a specific named source.
+    ///
+    /// This method only works for sources that implement [`Sink`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The source does not exist.
+    /// - The source is not writable.
+    /// - The write operation fails.
+    #[inline]
+    pub async fn add_to_source(&mut self, name: &str, item: T) -> Result<(), SendError>
+    where
+        T: Clone + 'static,
+    {
+        for (source_name, source) in &mut self.sources {
+            if source_name == name
+                && let Some(sink) = source.as_any_mut().downcast_mut::<MemorySource<T>>()
+            {
+                return sink.send_one(&item).await;
+            }
+        }
+        Err(SendError::Rejected)
+    }
+
     /// Fetch all items from all registered sources, including their source name.
     ///
     /// # Errors
@@ -249,7 +318,6 @@ where
         &mut self,
         query: &(dyn Query<T> + Sync),
     ) -> Result<Vec<SearchResult<T>>, FetchError> {
-
         let mut out = Vec::new();
 
         for (name, source) in &mut self.sources {

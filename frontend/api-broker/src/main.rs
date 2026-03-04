@@ -8,14 +8,15 @@ use axum::{
     response::IntoResponse,
     routing::{get, post},
 };
+use broker::connector::Source;
 use broker::{
-    Broker,
+    Broker, SearchResult,
+    connector::MemorySource,
     encode::json::Json as BrokerJson,
     encode::xml::Xml,
     query::Queryable,
     query::combinators::True,
     rest::{Build as _, Builder as RestBuilder},
-    SearchResult,
 };
 use serde::{Deserialize, Serialize};
 use sqlx::{FromRow, SqlitePool};
@@ -64,6 +65,33 @@ struct Book {
     isbn: String,
 }
 
+/// Payload for creating a new in-memory source.
+#[derive(Deserialize)]
+struct AddSourceRequest {
+    /// Name of the source to create.
+    name: String,
+}
+
+/// Payload for adding a book to a source.
+#[derive(Deserialize)]
+struct AddBookRequest {
+    /// Book title
+    title: String,
+    /// Book author
+    author: String,
+    /// Book ISBN
+    isbn: String,
+    /// Target source name
+    source: String,
+}
+
+/// Public representation of source
+#[derive(Serialize)]
+struct SourceInfo {
+    /// Name of the source
+    name: String,
+}
+
 /// Entrypoint: sets up the broker, database, and HTTP server.
 ///
 /// # Panics
@@ -73,6 +101,7 @@ struct Book {
 #[tokio::main]
 async fn main() {
     let mut broker = Broker::<Book>::new();
+    let memory = MemorySource::new();
 
     // JSON source
     broker.add_source(
@@ -83,7 +112,8 @@ async fn main() {
                 .expect("Failed to create JSON broker source")
                 .decoder(BrokerJson)
                 .build(),
-    ));
+        ),
+    );
 
     // XML source
     broker.add_source(
@@ -94,7 +124,10 @@ async fn main() {
                 .expect("Failed to create XML broker source")
                 .decoder(Xml)
                 .build(),
-    ));
+        ),
+    );
+
+    broker.add_source("Memory", Box::new(memory));
 
     let db = SqlitePool::connect("sqlite://./books.db")
         .await
@@ -128,6 +161,8 @@ async fn main() {
         .route("/", get(|| async { "API Broker Running" }))
         .route("/query", post(query_handler))
         .route("/books", post(add_book))
+        .route("/sources", post(add_source_handler))
+        .route("/sources", get(list_sources))
         .layer(cors)
         .with_state(state);
 
@@ -156,7 +191,10 @@ async fn query_handler(
     // Get all broker books
     let mut results = {
         let mut broker = state.broker.lock().await;
-        broker.fetch_all_with_source(&True).await.unwrap_or_default()
+        broker
+            .fetch_all_with_source(&True)
+            .await
+            .unwrap_or_default()
     };
 
     // Get all SQLite books
@@ -190,15 +228,15 @@ async fn query_handler(
                         "author" => book
                             .author
                             .to_lowercase()
-                            .starts_with(&cond.value.to_lowercase()),
+                            .contains(&cond.value.to_lowercase()),
                         "title" => book
                             .title
                             .to_lowercase()
-                            .starts_with(&cond.value.to_lowercase()),
+                            .contains(&cond.value.to_lowercase()),
                         "isbn" => book
                             .isbn
                             .to_lowercase()
-                            .starts_with(&cond.value.to_lowercase()),
+                            .contains(&cond.value.to_lowercase()),
                         _ => false,
                     }),
                 _ => payload
@@ -229,21 +267,58 @@ async fn query_handler(
 /// Handles POST `/books` by inserting a new book into `SQLite DB`.
 async fn add_book(
     State(state): State<AppState>,
-    AxumJson(book): AxumJson<Book>,
+    AxumJson(payload): AxumJson<AddBookRequest>,
 ) -> impl IntoResponse {
-    let result = sqlx::query("INSERT INTO books (title, author, isbn) VALUES (?, ?, ?)")
-        .bind(&book.title)
-        .bind(&book.author)
-        .bind(&book.isbn)
-        .execute(&state.db)
-        .await;
+    let book = Book {
+        title: payload.title,
+        author: payload.author,
+        isbn: payload.isbn,
+    };
 
-    match result {
-        Ok(_) => (StatusCode::CREATED, AxumJson("Book added")).into_response(),
-        Err(_) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            AxumJson("Failed to add book"),
-        )
-            .into_response(),
+    let mut broker = state.broker.lock().await;
+
+    match broker.add_to_source(&payload.source, book).await {
+        Ok(()) => (StatusCode::CREATED, "Book added").into_response(),
+        Err(_) => (StatusCode::BAD_REQUEST, "Source not found or not writable").into_response(),
     }
+}
+
+/// Adds a new in-memory source.
+///
+/// # Errors
+///
+/// Returns `StatusCode::BAD_REQUEST` if the provided name is empty
+/// or invalid.
+async fn add_source_handler(
+    State(state): State<AppState>,
+    AxumJson(payload): AxumJson<AddSourceRequest>,
+) -> Result<StatusCode, StatusCode> {
+    let clean_name = payload.name.trim().to_owned();
+
+    let source: Box<dyn Source<Book> + Send> = Box::new(MemorySource::new());
+
+    {
+        let mut broker = state.broker.lock().await;
+        broker.add_source(clean_name, source);
+    };
+
+    Ok(StatusCode::CREATED)
+}
+
+/// Returns a list of all registered sources.
+///
+/// This endpoint is used by the frontend to populate
+/// the source selection dropdown.
+async fn list_sources(State(state): State<AppState>) -> AxumJson<Vec<SourceInfo>> {
+    let sources = {
+        let broker = state.broker.lock().await;
+
+        broker
+            .sources()
+            .iter()
+            .map(|(name, _)| SourceInfo { name: name.clone() })
+            .collect()
+    };
+
+    AxumJson(sources)
 }

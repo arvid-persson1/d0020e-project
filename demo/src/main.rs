@@ -55,22 +55,24 @@ async fn main() {
     broker.add_source(
         "JSON API",
         Box::new(
-        RestBuilder::new()
-            .source_url("http://127.0.0.1:8080/books")
-            .expect("Failed to parse URL.")
-            .decoder(Json)
-            .build(),
-    ));
+            RestBuilder::new()
+                .source_url("http://127.0.0.1:8080/books")
+                .expect("Failed to parse URL.")
+                .decoder(Json)
+                .build(),
+        ),
+    );
     println!("Registered source (REST endpoint on 127.0.0.1:8080).");
     broker.add_source(
         "XML API",
         Box::new(
-        RestBuilder::new()
-            .source_url("http://127.0.0.1:1616/books")
-            .expect("Failed to parse URL.")
-            .decoder(Xml)
-            .build(),
-    ));
+            RestBuilder::new()
+                .source_url("http://127.0.0.1:1616/books")
+                .expect("Failed to parse URL.")
+                .decoder(Xml)
+                .build(),
+        ),
+    );
     println!("Registered source (REST endpoint on 127.0.0.1:1616).");
     println!();
 

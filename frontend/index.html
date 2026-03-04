@@ -35,10 +35,28 @@
     <input type="text" id="title" placeholder="Title" required />
     <input type="text" id="author" placeholder="Author" required />
     <input type="text" id="isbn" placeholder="ISBN" required />
+
+    <select id="bookSource">
+    </select>
+
     <button type="submit">Add Book</button>
 </form>
 
 <p id="addResult"></p>
+
+<h2>Add Source</h2>
+
+<input type="text" id="sourceName" placeholder="Source Name" />
+<input type="text" id="sourceUrl" placeholder="Source URL" />
+
+<select id="sourceFormat">
+    <option value="json">JSON</option>
+    <option value="xml">XML</option>
+</select>
+
+<button onclick="addSource()">Add Source</button>
+
+<p id="sourceStatus"></p>
 
 <h2>Results:</h2>
 <ul id="results"></ul>
