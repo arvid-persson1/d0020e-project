@@ -131,11 +131,18 @@ pub struct MemorySource<T> {
 }
 
 impl<T> MemorySource<T> {
-    /// Creates a new empty in-memory source.
+    /// Creates a new in-memory source
     #[must_use]
     #[inline]
     pub const fn new() -> Self {
         Self { items: Vec::new() }
+    }
+}
+
+impl<T> Default for MemorySource<T> {
+    #[inline]
+    fn default() -> Self {
+        Self::new()
     }
 }
 
