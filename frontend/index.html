@@ -1,69 +1,120 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <title>Book Search</title>
+
+    <link rel="stylesheet" href="style.css">
+
 </head>
+
 <body>
+
 <h1>Book Search</h1>
 
-<div id="conditions">
-    <div class="condition">
-        <select class="field">
-            <option value="author">Author</option>
-            <option value="title">Title</option>
-            <option value="isbn">ISBN</option>
+<div class="container">
+
+    <!-- SEARCH AREA -->
+    <div class="search-layout">
+
+        <!-- SEARCH BOX -->
+        <div class="search-box">
+
+            <h2>Search</h2>
+
+            <div id="conditions">
+
+                <div class="condition">
+                    <select class="field">
+                        <option value="author">Author</option>
+                        <option value="title">Title</option>
+                        <option value="isbn">ISBN</option>
+                    </select>
+
+                    <input class="value" type="text" placeholder="Enter value">
+                </div>
+
+            </div>
+
+            <div class="search-buttons">
+
+                <button onclick="search()">Search</button>
+
+                <div class="operator-and-add">
+                    <select id="operator">
+                        <option value="and">AND</option>
+                        <option value="or">OR</option>
+                    </select>
+
+                    <button onclick="addCondition()">Add Condition</button>
+                </div>
+
+            </div>
+
+        </div>
+
+
+        <!-- SOURCES -->
+        <div class="sources-box">
+
+            <h2>Sources</h2>
+
+            <div id="sources"></div>
+
+        </div>
+
+    </div>
+
+
+    <!-- RESULTS -->
+    <h2>Results</h2>
+
+    <ul id="results"></ul>
+
+
+
+    <!-- ADDING SECTION -->
+    <details class="adding-section">
+
+        <summary>Add Books / Sources</summary>
+
+
+        <h2>Add Book</h2>
+
+        <form id="addBookForm">
+
+            <input id="title" type="text" placeholder="Title" required>
+            <input id="author" type="text" placeholder="Author" required>
+            <input id="isbn" type="text" placeholder="ISBN" required>
+
+            <select id="bookSource"></select>
+
+            <button type="submit">Add Book</button>
+
+        </form>
+
+        <p id="addResult"></p>
+
+
+        <h2>Add Source</h2>
+
+        <input id="sourceName" type="text" placeholder="Source Name">
+        <input id="sourceUrl" type="text" placeholder="Source URL">
+
+        <select id="sourceFormat">
+            <option value="json">JSON</option>
+            <option value="xml">XML</option>
         </select>
 
-        <input type="text" class="value" placeholder="Enter value" />
-    </div>
+        <button onclick="addSource()">Add Source</button>
+
+        <p id="sourceStatus"></p>
+
+    </details>
+
 </div>
 
-<br>
-
-<select id="operator">
-    <option value="and">AND</option>
-    <option value="or">OR</option>
-</select>
-
-<button onclick="addCondition()">Add Condition</button>
-<button onclick="search()">Search</button>
-
-<h2>Sources</h2>
-<div id="sources"></div>
-
-<h2>Add Book</h2>
-
-<form id="addBookForm">
-    <input type="text" id="title" placeholder="Title" required />
-    <input type="text" id="author" placeholder="Author" required />
-    <input type="text" id="isbn" placeholder="ISBN" required />
-
-    <select id="bookSource">
-    </select>
-
-    <button type="submit">Add Book</button>
-</form>
-
-<p id="addResult"></p>
-
-<h2>Add Source</h2>
-
-<input type="text" id="sourceName" placeholder="Source Name" />
-<input type="text" id="sourceUrl" placeholder="Source URL" />
-
-<select id="sourceFormat">
-    <option value="json">JSON</option>
-    <option value="xml">XML</option>
-</select>
-
-<button onclick="addSource()">Add Source</button>
-
-<p id="sourceStatus"></p>
-
-<h2>Results:</h2>
-<ul id="results"></ul>
-
 <script src="script.js"></script>
+
 </body>
 </html>

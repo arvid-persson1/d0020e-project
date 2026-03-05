@@ -1,0 +1,183 @@
+/* Page layout */
+body {
+    font-family: Arial, Helvetica, sans-serif;
+    background-color: #f4f6f8;
+    margin: 0;
+    padding: 30px;
+
+    display: flex;
+    justify-content: center;
+}
+
+/* Headings */
+h1 {
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+h2 {
+    margin-top: 30px;
+    border-bottom: 2px solid #ddd;
+    padding-bottom: 5px;
+}
+
+/* Containers */
+#conditions,
+#sources,
+form,
+#results {
+    background: white;
+    padding: 15px;
+    border-radius: 8px;
+    margin-top: 10px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+}
+
+/* Inputs */
+input, select {
+    padding: 8px;
+    margin: 5px 5px 5px 0;
+    border-radius: 5px;
+    border: 1px solid #ccc;
+    font-size: 14px;
+}
+
+/* Buttons */
+button {
+    padding: 8px 14px;
+    margin: 5px 5px 5px 0;
+    border: none;
+    border-radius: 5px;
+    background-color: #2f80ed;
+    color: white;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+button:hover {
+    background-color: #1c60b8;
+}
+
+/* Conditions row */
+.condition {
+    margin-bottom: 8px;
+}
+
+.condition {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.condition-operator {
+    font-weight: bold;
+    color: #2f80ed;
+    min-width: 40px;
+}
+
+.conditions-controls {
+    display: flex;
+    gap: 15px;
+    align-items: flex-start;
+}
+
+.conditions-box {
+    flex: 1;
+}
+
+.conditions-controls button {
+    height: fit-content;
+    white-space: nowrap;
+}
+
+/* Source checkboxes */
+#sources label {
+    display: block;
+    margin-bottom: 4px;
+}
+
+/* Results */
+#results {
+    list-style: none;
+    padding-left: 0;
+}
+
+#results li {
+    padding: 10px;
+    border-bottom: 1px solid #eee;
+}
+
+#results li:last-child {
+    border-bottom: none;
+}
+
+/* Status messages */
+#addResult, #sourceStatus {
+    font-weight: bold;
+    margin-top: 10px;
+}
+
+.container {
+    max-width: 1000px;
+    width: 100%;
+}
+
+/* Search layout */
+
+.search-layout {
+    display: flex;
+    gap: 30px;
+    align-items: flex-start;
+}
+
+/* Left search box */
+
+.search-box {
+    flex: 2;
+    background: white;
+    padding: 15px;
+    border-radius: 8px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+}
+
+/* Right sources box */
+
+.sources-box {
+    flex: 1;
+    background: white;
+    padding: 15px;
+    border-radius: 8px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+}
+
+/* Search buttons stacked */
+
+.search-buttons {
+    margin-top: 15px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+/* Adding section */
+
+.adding-section {
+    margin-top: 40px;
+    background: white;
+    padding: 15px;
+    border-radius: 8px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+}
+
+.adding-section summary {
+    font-size: 18px;
+    font-weight: bold;
+    cursor: pointer;
+    margin-bottom: 10px;
+}
+
+.operator-and-add {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}

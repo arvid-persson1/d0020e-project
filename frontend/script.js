@@ -51,15 +51,22 @@ async function search() {
         li.textContent = `"${book.title}" by ${book.author} (ISBN: ${book.isbn}) - Source: ${result.source}`;
         resultsList.appendChild(li);
     });
+
+    document.getElementById("resultsCount").innerText =
+        `Found ${data.length} books`;
 }
 
 function addCondition() {
     const container = document.getElementById("conditions");
 
+    const operator = document.getElementById("operator").value.toUpperCase();
+
     const div = document.createElement("div");
     div.className = "condition";
 
     div.innerHTML = `
+        <span class="condition-operator">${operator}</span>
+
         <select class="field">
             <option value="author">Author</option>
             <option value="title">Title</option>
@@ -138,6 +145,8 @@ document.getElementById("addBookForm").addEventListener("submit", async (e) => {
         document.getElementById("addResult").innerText =
             "Error adding book: " + error.message;
     }
+
+    document.getElementById("addBookForm").reset();
 });
 
 async function loadSources() {
