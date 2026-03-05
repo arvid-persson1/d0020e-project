@@ -52,6 +52,8 @@ struct QueryRequest {
     /// `"and"` requires all conditions to match,
     /// `"or"` requires at least one.
     operator: String,
+    /// Sources to search in. Empty = search all.
+    sources: Vec<String>,
 }
 
 /// Representation of a book.
@@ -218,6 +220,11 @@ async fn query_handler(
     let filtered: Vec<SearchResult<Book>> = results
         .into_iter()
         .filter(|result| {
+            // Source filtering
+            if !payload.sources.is_empty() && !payload.sources.contains(&result.source) {
+                return false;
+            }
+
             let book = &result.item;
 
             match payload.operator.to_lowercase().as_str() {

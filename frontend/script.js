@@ -19,6 +19,10 @@ async function search() {
         return;
     }
 
+    const selectedSources = Array.from(
+        document.querySelectorAll("#sources input:checked")
+    ).map(cb => cb.value);
+
     const response = await fetch("http://localhost:3000/query", {
         method: "POST",
         headers: {
@@ -26,7 +30,8 @@ async function search() {
         },
         body: JSON.stringify({
             operator,
-            conditions
+            conditions,
+            sources: selectedSources
         })
     });
 
@@ -136,17 +141,35 @@ document.getElementById("addBookForm").addEventListener("submit", async (e) => {
 });
 
 async function loadSources() {
-    const response = await fetch("http://localhost:3000/sources");
-    const sources = await response.json();
+    const res = await fetch("http://localhost:3000/sources");
+    const sources = await res.json();
 
-    const select = document.getElementById("bookSource");
-    select.innerHTML = "";
+    const dropdown = document.getElementById("bookSource");
+    const searchContainer = document.getElementById("sources");
+
+    dropdown.innerHTML = "";
+    searchContainer.innerHTML = "";
 
     sources.forEach(src => {
+
+        // ----- Add Book dropdown -----
         const option = document.createElement("option");
         option.value = src.name;
         option.textContent = src.name;
-        select.appendChild(option);
+        dropdown.appendChild(option);
+
+        // ----- Search source checkboxes -----
+        const label = document.createElement("label");
+
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        checkbox.value = src.name;
+
+        label.appendChild(checkbox);
+        label.appendChild(document.createTextNode(" " + src.name));
+
+        searchContainer.appendChild(label);
+        searchContainer.appendChild(document.createElement("br"));
     });
 }
 
