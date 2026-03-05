@@ -10,9 +10,11 @@ repository.workspace = true
 version.workspace = true
 
 [dependencies]
-broker = { features = ["rest", "graphql"], workspace = true }
+broker = { features = ["rest"], workspace = true }
 serde = { version = "1.0.228", features = ["derive"] }
 tokio = { version = "1.49.0", features = ["full"] }
+reqwest = { features = ["stream","json"], version = "0.12.24" }
+serde_json = "1.0.145"
 
 [lints]
 workspace = true

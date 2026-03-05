@@ -36,8 +36,12 @@ pub trait Query<T> {
     /// possible.
     #[cfg(feature = "rest")]
     fn to_http_multi(&self) -> Option<Vec<HttpQuery<'_>>>;
-}
 
+    /// Translate into a single ['HttpQuery'], structured for graphql api:s.
+    /// NOTE: In case I choose to use this function
+    #[cfg(feature = "graphql")]
+    fn to_grahpql_single(&self) -> Single<'_, HttpQuery<'_>, T>;
+}
 /// A best-effort translation of the input query to a single output query.
 ///
 /// In cases where total translation is not possible, [`query`](Self::query) attempts to fetch a

@@ -1,12 +1,9 @@
-// This is where I always just get lost when trying to create this connector.
-// I give up now and need to actually sit down and talk to someone who can understand the project structure properly.
-
 use crate::{
     Query,
     connector::{Sink, Source},
     encode::{Codec, Decode, Encode},
     errors::{ConnectionError, DecodeError, FetchError, FetchOneError, SendError},
-    query::{GraphQLQuery, Single},
+    query::{HttpQuery, Single},
 };
 use async_trait::async_trait;
 use futures::{StreamExt as _, TryStreamExt as _, future::ready, stream::BoxStream};
@@ -38,11 +35,11 @@ pub struct ReadWrite<T, E, D, C> {
     _phantom: PhantomData<T>,
 }
 
-/// Helper for Source implementation. NOTE: AI, double check!!!
+/// Helper that sends query and fetches result.
 async fn fetch_impl(
     client: &Client,
     url: Url,
-    query: GraphQLQuery<'_>,
+    query: HttpQuery<'_>,
 ) -> Result<Response, FetchError> {
     let body = serde_json::to_vec(&query).map_err(|e| FetchError::InvalidQuery(Box::new(e)))?;
     client
@@ -54,12 +51,28 @@ async fn fetch_impl(
         .map_err(Into::into)
 }
 
-/// Helper for Sink implementation. NOTE: AI, double check!!!
+// TODO: I have three main solutions to solve the current problem:
+// 1 - I use the existing httpQuery and just have a different fetch_impl and send_impl that
+//   restructures for graphql. I think this would be fastest and least painful, but I don't get how
+//   this would work with the "graphql" featuer
+// 2 - I can add the function to_graphql_single to the query trait and make it use the
+//   to_http_single function within the default solution, then use it here in graphql.rs. This
+//   would make using the feature easy, but I think it would force the "graphql" feature to also
+//   use "rest" automatically.
+// 3 - I can add the function to_graphql_single to the query trait and implement it properly. This
+//   though, I think would be VERY time consuming since it's needed for EVERY SINGLE primitive.
+// -------------------------------------------------------------------------------------------------
+// All three of these solutions *should* be able to reuse most things like the builder though I'm
+// unsure which would be worth to spring for at this point. I also believe that the graphql.rs file
+// here would be needed. though I don't get how it would be linked to the feature "graphql".
+
+/// Helper that sends data using reqwest.
 async fn send_impl<B>(client: &Client, url: Url, body: B) -> Result<Response, ConnectionError>
 where
     B: Into<Body>,
 {
-    let request = client.post(url).body(body).build().unwrap(); // safe unwrap – URL already validated
+    // safe unwrap – URL already validated
+    let request = client.post(url).body(body).build().unwrap();
     client.execute(request).await.map_err(Into::into)
 }
 
