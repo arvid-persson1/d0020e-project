@@ -2,15 +2,15 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Book Search</title>
+    <header class="page-header">
+    <h1>Book Search</h1>
+    </header>
 
     <link rel="stylesheet" href="style.css">
 
 </head>
 
 <body>
-
-<h1>Book Search</h1>
 
 <div class="container">
 
@@ -67,9 +67,11 @@
 
 
     <!-- RESULTS -->
-    <h2>Results</h2>
-
-    <ul id="results"></ul>
+    <div id="resultsSection" class="hidden">
+        <h2>Results</h2>
+        <p id="noResults" class="hidden">No results found.</p>
+        <ul id="results"></ul>
+    </div>
 
 
 

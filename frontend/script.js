@@ -37,8 +37,28 @@ async function search() {
 
     const data = await response.json();
 
+    const resultsSection = document.getElementById("resultsSection");
     const resultsList = document.getElementById("results");
+    const noResults = document.getElementById("noResults");
+
     resultsList.innerHTML = "";
+    noResults.classList.add("hidden");
+
+    if (data.length === 0) {
+        resultsSection.classList.remove("hidden");
+        noResults.classList.remove("hidden");
+        return;
+    }
+
+// Show results section
+    resultsSection.classList.remove("hidden");
+
+    data.forEach(result => {
+        const li = document.createElement("li");
+        const book = result.item;
+        li.textContent = `"${book.title}" by ${book.author} (ISBN: ${book.isbn}) - Source: ${result.source}`;
+        resultsList.appendChild(li);
+    });
 
     if (data.length === 0) {
         resultsList.innerHTML = "<li>No results found</li>";
@@ -74,7 +94,14 @@ function addCondition() {
         </select>
 
         <input type="text" class="value" placeholder="Enter value" />
+
+        <button type="button" class="delete-condition">✖</button>
     `;
+
+    // Add delete functionality
+    div.querySelector(".delete-condition").addEventListener("click", () => {
+        div.remove();
+    });
 
     container.appendChild(div);
 }

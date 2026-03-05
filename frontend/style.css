@@ -4,9 +4,14 @@ body {
     background-color: #f4f6f8;
     margin: 0;
     padding: 30px;
+}
 
-    display: flex;
-    justify-content: center;
+/* Center page content */
+
+.container,
+.page-header {
+    max-width: 900px;
+    margin: 0 auto;
 }
 
 /* Headings */
@@ -97,6 +102,10 @@ button:hover {
 }
 
 /* Results */
+.hidden {
+    display: none;
+}
+
 #results {
     list-style: none;
     padding-left: 0;
@@ -180,4 +189,39 @@ button:hover {
     display: flex;
     gap: 10px;
     align-items: center;
+}
+
+/* delete conditions */
+.delete-condition {
+    background-color: #e74c3c;
+    padding: 6px 10px;
+    font-size: 12px;
+}
+
+.delete-condition:hover {
+    background-color: #c0392b;
+}
+
+/* Header */
+
+.page-header {
+    background: linear-gradient(135deg, #2f80ed, #1c60b8);
+    color: white;
+    padding: 25px 30px;
+    border-radius: 10px;
+    margin-bottom: 30px;
+    text-align: center;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.page-header h1 {
+    margin: 0;
+    font-size: 32px;
+    letter-spacing: 1px;
+}
+
+.subtitle {
+    margin-top: 8px;
+    font-size: 15px;
+    opacity: 0.9;
 }
