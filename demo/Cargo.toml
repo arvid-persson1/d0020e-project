@@ -10,7 +10,7 @@ repository.workspace = true
 version.workspace = true
 
 [dependencies]
-broker = { features = ["rest"], workspace = true }
+broker = { features = ["rest", "postgres"], workspace = true }
 serde = { version = "1.0.228", features = ["derive"] }
 tokio = { version = "1.49.0", features = ["full"] }
 

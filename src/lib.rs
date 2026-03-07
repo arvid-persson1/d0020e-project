@@ -18,6 +18,9 @@ use futures::{
 use std::{collections::HashSet, hash::Hash};
 use tokio as _;
 
+use diesel as _;
+use diesel_derive_enum as _;
+
 pub mod errors;
 use crate::errors::{FetchError, FetchOneError, SendError};
 
@@ -32,6 +35,9 @@ pub use encode::{Codec, Decode, Encode};
 
 #[cfg(feature = "rest")]
 pub mod rest;
+
+#[cfg(feature = "postgres")]
+pub mod postgres;
 
 /// A "full" connector; one that is both a [`Source`] and a [`Sink`].
 trait Full<T>: Source<T> + Sink<T> + Send + Sync
