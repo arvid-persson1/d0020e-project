@@ -1,6 +1,7 @@
 //! Models file for book related types and for the diesel orm.
 use super::schema::books;
 use serde::{Deserialize, Serialize};
+use std::fmt::{Display, Formatter, Result};
 
 #[derive(
     Debug, Clone, Eq, PartialEq, Hash, diesel_derive_enum::DbEnum, Serialize, Deserialize, Default,
@@ -55,4 +56,31 @@ pub struct Book {
     pub format: BookFormatType,
     /// isbn
     pub isbn: String,
+}
+
+impl Display for BookFormatType {
+    #[inline]
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        // Maps enum variants to strings.
+        let s = match self {
+            Self::Pdf => "PDF",
+            Self::Docx => "Docx",
+            Self::Epub => "ePub",
+            Self::Hardcover => "Hardcover",
+            Self::Paperback => "Paperback",
+            Self::Pocket => "Pocket",
+        };
+        write!(f, "{s}")
+    }
+}
+
+impl Display for Book {
+    #[inline]
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        write!(
+            f,
+            "Book {{ title: \"{}\", author: \"{}\", isbn: \"{}\", format: {} }}",
+            self.title, self.author, self.isbn, self.format
+        )
+    }
 }

@@ -82,7 +82,7 @@ async fn main() {
         Ok(v) => {
             println!("Found books:");
             for book in v {
-                println!("{book:#?}");
+                println!("{book}");
             }
         },
         Err(e) => {
@@ -109,7 +109,7 @@ async fn main() {
         Ok(v) => {
             println!("Found books:");
             for book in v {
-                println!("{book:#?}");
+                println!("{book}");
             }
         },
         Err(e) => {
@@ -129,7 +129,7 @@ async fn main() {
         Ok(books) => {
             println!("Found books:");
             for book in books {
-                println!("  {book:#?}");
+                println!("  {book}");
             }
         },
         Err(e) => println!("An error occurred: {e:#?}"),

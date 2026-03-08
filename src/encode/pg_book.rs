@@ -1,7 +1,7 @@
 //! Decoder/Encoder for the postgres connector that uses diesel orm
 use crate::postgres::models::Book;
-use crate::postgres::schema::books; // Required for the encoder to find books::table!
-use crate::postgres::{PgDecode, PgEncode}; // Adjust this path if your traits live elsewhere
+use crate::postgres::schema::books;
+use crate::postgres::{PgDecode, PgEncode};
 use diesel::prelude::*;
 
 /// The Postgres decoder/encoder for the Book model.
