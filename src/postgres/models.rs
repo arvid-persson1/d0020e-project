@@ -1,6 +1,7 @@
 //! Models file for book related types and for the diesel orm.
 use super::schema::books;
 use diesel::prelude::*;
+//use crate::postgres::PgDecode;
 
 #[derive(Debug, Eq, PartialEq, diesel_derive_enum::DbEnum)]
 #[ExistingTypePath = "crate::postgres::schema::sql_types::BookFormatType"]
@@ -40,7 +41,7 @@ pub struct Book {
     pub isbn: String,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Default, Debug, Clone)]
 /// Book decoder that uses diesel
 pub struct BookDecoder;
 

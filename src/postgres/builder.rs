@@ -5,7 +5,6 @@ use diesel::PgConnection;
 use diesel::r2d2::{ConnectionManager, Pool, PoolError};
 use std::marker::PhantomData;
 
-// Notice how clean the generics are now! No more C or COMBINED needed.
 #[derive(Clone, Debug)]
 /// Builder struct
 pub struct Builder<
@@ -27,7 +26,7 @@ pub struct Builder<
 }
 
 impl<T> Builder<T> {
-    /// Construct a `Builder` with no fields set.
+    /// Constructs a `Builder` with no fields set.
     #[must_use]
     #[inline]
     pub const fn new() -> Self {
@@ -89,7 +88,6 @@ impl<T, E, const URL: bool, const ENCODER: bool> Builder<T, E, (), URL, ENCODER,
 
 impl<T, const URL: bool> Builder<T, (), (), URL, false, false> {
     /// Add a combined codec to the connector, serving as both encoder and decoder.
-    /// This instantly advances both ENCODER and DECODER states to true!
     #[inline]
     pub fn codec<C: Clone>(self, codec: C) -> Builder<T, C, C, URL, true, true> {
         Builder {

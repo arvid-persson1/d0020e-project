@@ -11,7 +11,8 @@ CREATE TABLE books (
 INSERT INTO books (isbn, title, author, format) VALUES
     ('9788316497541', 'The Last Wish: Introducing the Witcher', 'Andrzej Sapkowski', 'Hardcover'),
     ('0000000000001', 'Blood of Elves', 'Andrzej Sapkowski', 'Paperback'),
-    ('0000000000002', 'Time of Contempt', 'Andrzej Sapkowski', 'Epub');
+    ('0000000000002', 'Time of Contempt', 'Andrzej Sapkowski', 'Epub')
+    ON CONFLICT DO NOTHING;
 
 CREATE ROLE mock_reader WITH LOGIN PASSWORD 'mock';
 

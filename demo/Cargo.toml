@@ -11,6 +11,7 @@ version.workspace = true
 
 [dependencies]
 broker = { features = ["rest", "postgres"], workspace = true }
+diesel = { version = "2.3.6", features = ["postgres", "r2d2"] }
 serde = { version = "1.0.228", features = ["derive"] }
 tokio = { version = "1.49.0", features = ["full"] }
 

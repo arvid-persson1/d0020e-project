@@ -156,7 +156,7 @@ where
     fn to_sql_single(&self) -> Single<'_, SqlStatement, T> {
         Single {
             query: SqlStatement {
-                query_text: format!("{} = ?", self.field.name),
+                query_text: format!("{} = '{}'", self.field.name, self.value),
                 params: vec![self.value.to_string()],
             },
             residue: Vec::new(),
@@ -211,7 +211,7 @@ where
     fn to_sql_single(&self) -> Single<'_, SqlStatement, T> {
         Single {
             query: SqlStatement {
-                query_text: format!("{} != ?", self.field.name),
+                query_text: format!("{} != '{}'", self.field.name, self.value.to_string()),
                 params: vec![self.value.to_string()],
             },
             residue: Vec::new(),
@@ -262,7 +262,7 @@ where
     fn to_sql_single(&self) -> Single<'_, SqlStatement, T> {
         Single {
             query: SqlStatement {
-                query_text: format!("{} > ?", self.field.name),
+                query_text: format!("{} > '{}'", self.field.name, self.value.to_string()),
                 params: vec![self.value.to_string()],
             },
             // Empty residue. Postgres handles the logic natively
@@ -314,7 +314,7 @@ where
     fn to_sql_single(&self) -> Single<'_, SqlStatement, T> {
         Single {
             query: SqlStatement {
-                query_text: format!("{} < ?", self.field.name),
+                query_text: format!("{} < '{}'", self.field.name, self.value.to_string()),
                 params: vec![self.value.to_string()],
             },
             residue: Vec::new(),

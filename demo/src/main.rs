@@ -5,19 +5,26 @@
 #![allow(clippy::shadow_unrelated, reason = "Demo code.")]
 #![allow(clippy::missing_docs_in_private_items, reason = "Demo code.")]
 
+use broker::postgres::PgDecode;
+use broker::postgres::models::Book as Pgbook;
 use broker::{
     Broker,
     connector::Source as _,
     encode::json::Json,
     encode::xml::Xml,
+    postgres::{Build as _, Builder as PostgresBuilder},
     query::{
         Queryable,
         combinators::{And, Or},
     },
     rest::{Build as _, Builder as RestBuilder},
 };
+use diesel::RunQueryDsl as _;
+use diesel::pg::PgConnection;
+use diesel::result::Error as dslError;
 use serde::Deserialize;
 use std::{
+    //env::var,
     fmt::{Display, Error as FmtError, Formatter},
     io::stdin,
 };
@@ -42,6 +49,38 @@ impl Display for Book {
             isbn,
         } = self;
         write!(f, "\"{title}\" by {author}; ISBN {isbn}")
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct DemoBookDecoder;
+
+// Implements PgDecode for the local Book struct
+impl PgDecode<Book> for DemoBookDecoder {
+    #[inline]
+    fn decode_all(
+        &self,
+        conn: &mut PgConnection,
+        sql_text: &str,
+    ) -> Result<Vec<Book>, dslError> {
+        let full_query = if sql_text.trim().is_empty() {
+            "SELECT * FROM books".to_owned()
+        } else {
+            format!("SELECT * FROM books WHERE {sql_text}")
+        };
+
+        let db_books = diesel::sql_query(full_query).load::<Pgbook>(conn)?;
+
+        let unified_books = db_books
+            .into_iter()
+            .map(|db_model| Book {
+                title: db_model.title,
+                author: db_model.author,
+                isbn: db_model.isbn,
+            })
+            .collect();
+
+        Ok(unified_books)
     }
 }
 
@@ -73,8 +112,23 @@ async fn main() {
                 .build(),
         ),
     );
+
     println!("Registered source (REST endpoint on 127.0.0.1:1616).");
-    println!();
+
+    //let pg_url = var("postgres://mock_reader@localhost:5632/bookery_db").expect("Failed to parse URL.");
+
+    broker.add_source(
+        "PostgresDB".into(),
+        Box::new(
+            PostgresBuilder::<Book>::new()
+                .url("postgres://mock_reader@localhost:5632/bookery_db")
+                .decoder(DemoBookDecoder) // <--- Use your custom adapter!
+                .build()
+                .expect("Failed to build Postgres connector"),
+        ),
+    );
+
+    println!("Registered source postgres");
 
     let query = Book::author().eq("Jane Austen");
     println!("Defined query: {query:#?}\nPress ENTER to run.");
@@ -93,8 +147,8 @@ async fn main() {
                 println!("{book}");
             }
         },
-        Err(_) => {
-            println!("An error occurred.");
+        Err(e) => {
+            println!("An error occurred: {e:#?}");
             return;
         },
     }
@@ -120,9 +174,26 @@ async fn main() {
                 println!("{book}");
             }
         },
-        Err(_) => {
-            println!("An error occurred.");
+        Err(e) => {
+            println!("An error occurred: {e:#?}");
             return;
         },
+    }
+
+    let query_sapkowski = Book::author().eq("Andrzej Sapkowski");
+    println!("Defined query: {{query: {query_sapkowski:#?}}}");
+    println!("Press ENTER to fetch Andrzej Sapkowski (Expected from Postgres DB)...");
+    let _unused = stdin().read_line(&mut buf).expect("Failed to read line.");
+    buf.clear();
+
+    match broker.fetch_all(&query_sapkowski).await {
+        Ok(books) if books.is_empty() => println!("No books matching query."),
+        Ok(books) => {
+            println!("Found books:");
+            for book in books {
+                println!("  {book}");
+            }
+        },
+        Err(e) => println!("An error occurred: {e:#?}"),
     }
 }
