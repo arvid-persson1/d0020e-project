@@ -53,7 +53,7 @@ async fn main() {
     println!("Instantiated broker.");
 
     broker.add_source(
-        "Bookery".into(),
+        "JSON API",
         Box::new(
             RestBuilder::new()
                 .source_url("http://127.0.0.1:8080/books")
@@ -64,7 +64,7 @@ async fn main() {
     );
     println!("Registered source (REST endpoint on 127.0.0.1:8080).");
     broker.add_source(
-        "Axum XML".into(),
+        "XML API",
         Box::new(
             RestBuilder::new()
                 .source_url("http://127.0.0.1:1616/books")

@@ -1,6 +1,5 @@
 #![feature(type_changing_struct_update)]
 #![feature(never_type)]
-#![allow(trivial_casts, reason = "Necessary for dyn casts.")]
 
 //! The data broker.
 
@@ -9,20 +8,23 @@
 // Currently, `tokio` is only used by tests. It will be used more later, so instead of making
 // it a test-only dependency for the time being, this is added temporarily to suppress warnings.
 // TODO: Remove.
+use crate::connector::Sink as _;
+use crate::errors::SendError;
 use async_trait::async_trait;
 use futures::{
-    FutureExt as _, StreamExt as _,
-    future::{join_all, try_join_all},
+    StreamExt as _,
+    future::try_join_all,
     stream::{BoxStream, FuturesUnordered, select_all},
 };
+use serde::Serialize;
+use std::any::Any;
 use std::{collections::HashSet, hash::Hash};
 use tokio as _;
 
 pub mod errors;
-use crate::errors::{FetchError, FetchOneError, SendError};
+use crate::errors::{FetchError, FetchOneError};
 
 pub mod connector;
-use connector::{Sink, Source};
 
 pub mod query;
 pub use query::Query;
@@ -33,56 +35,72 @@ pub use encode::{Codec, Decode, Encode};
 #[cfg(feature = "rest")]
 pub mod rest;
 
-/// A "full" connector; one that is both a [`Source`] and a [`Sink`].
-trait Full<T>: Source<T> + Sink<T> + Send + Sync
-where
-    T: Send + Sync,
-{
+use crate::connector::MemorySource;
+use connector::Source;
+
+/// A trait for types that can accept and store data.
+///
+/// This extends [`Source`] so that writable sources can both
+/// provide and receive data.
+///
+/// Implementors typically represent connectors that support
+/// write operations (for example in-memory sources or REST
+/// endpoints that allow POST requests).
+#[async_trait]
+pub trait Sink<T: Send>: Source<T> {
+    /// Adds a single item to the sink.
+    ///
+    /// Returns an error if the item could not be stored.
+    async fn add(&mut self, item: T) -> Result<(), FetchError>;
+
+    /// Attempts to downcast this source to a sink.
+    ///
+    /// Returns `Some` if the underlying implementation supports
+    /// writing, otherwise `None`.
+    #[inline]
+    fn as_sink(&self) -> Option<&dyn Sink<T>> {
+        None
+    }
 }
-impl<C, T> Full<T> for C
-where
-    C: Source<T> + Sink<T> + Send + Sync,
-    T: Send + Sync,
-{
+
+/// struct for sending sourcename to frontend
+#[derive(Debug, Clone, Serialize)]
+pub struct SearchResult<T> {
+    /// Source as item
+    pub item: T,
+    /// Source as String
+    pub source: String,
 }
 
 /// The broker.
 #[expect(missing_debug_implementations, reason = "TODO")]
 pub struct Broker<T> {
-    /// Complete connectors ([`Source`] and [`Sink`]) added to the broker.
-    connectors: Vec<(Box<str>, Box<dyn Full<T>>)>,
+    // TODO: Add names?
     /// Sources added to the broker.
-    sources: Vec<(Box<str>, Box<dyn Source<T> + Send + Sync>)>,
-    /// Sinks added to the broker.
-    sinks: Vec<(Box<str>, Box<dyn Sink<T> + Send + Sync>)>,
-}
-
-impl<T> Broker<T> {
-    /// Constructs a broker with no sources.
-    #[must_use]
-    #[inline]
-    pub fn new() -> Self {
-        Self {
-            connectors: Vec::new(),
-            sources: Vec::new(),
-            sinks: Vec::new(),
-        }
-    }
-
-    /// Add a source to the broker.
-    #[inline]
-    pub fn add_source(&mut self, name: Box<str>, source: Box<dyn Source<T> + Send + Sync>) {
-        self.sources.push((name, source));
-    }
+    sources: Vec<(String, Box<dyn Source<T> + Send>)>,
 }
 
 impl<T> Broker<T>
 where
     T: Send,
 {
-    /// Fetch some data matching a query, selecting only up to a given amount for each source.
-    ///
-    /// In other words, this returns up to a number of entries up to the number of sources times
+    /// Constructs a broker with no sources.
+    #[must_use]
+    #[inline]
+    pub fn new() -> Self {
+        Self {
+            sources: Vec::new(),
+        }
+    }
+
+    /// Add a source to the broker.
+    #[inline]
+    pub fn add_source(&mut self, name: impl Into<String>, source: Box<dyn Source<T> + Send>) {
+        self.sources.push((name.into(), source));
+    }
+
+    /// Fetch some data matching a query, selecting only up to a given amount for each source. In
+    /// other words, this returns up to a number of entries up to the number of sources times
     /// `per_source` (the actual number might be lower if any source fetches fewer than
     /// `per_source` entries).
     ///
@@ -95,15 +113,11 @@ where
         query: &(dyn Query<T> + Sync),
         per_source: usize,
     ) -> Result<Vec<T>, FetchError> {
-        let mut out = Vec::with_capacity((self.sources.len() + self.connectors.len()) * per_source);
+        let mut out = Vec::with_capacity(self.sources.len() * per_source);
         let mut futures = self
             .sources
             .iter_mut()
-            .map(|(name, source)| (&**name, &mut **source))
-            .chain(self.connectors.iter_mut().map(|(name, source)| {
-                (&**name, &mut **source as &mut (dyn Source<T> + Send + Sync))
-            }))
-            .map(|(_, source)| source.fetch(query))
+            .map(|source| source.1.fetch(query))
             .collect::<FuturesUnordered<_>>();
 
         while let Some(sample) = futures.next().await {
@@ -114,148 +128,6 @@ where
         }
 
         Ok(out)
-    }
-
-    /// Fetch some data matching a query, selecting only up to a given amount for each source.
-    ///
-    /// In other words, this returns up to a number of entries up to the number of sources times
-    /// `per_source` (the actual number might be lower if any source fetches fewer than
-    /// `per_source` entries).
-    ///
-    /// Includes names of sources.
-    ///
-    /// # Errors
-    ///
-    /// Delegates errors returned by [`fetch`](Self::fetch).
-    #[inline]
-    pub async fn sample_named(
-        &mut self,
-        query: &(dyn Query<T> + Sync),
-        per_source: usize,
-    ) -> Result<Vec<(&str, T)>, FetchError> {
-        let mut out = Vec::with_capacity((self.sources.len() + self.connectors.len()) * per_source);
-        let mut futures = self
-            .sources
-            .iter_mut()
-            .map(|(name, source)| (&**name, &mut **source))
-            .chain(self.connectors.iter_mut().map(|(name, source)| {
-                (&**name, &mut **source as &mut (dyn Source<T> + Send + Sync))
-            }))
-            .map(|(name, source)| source.fetch(query).map(move |fut| (name, fut)))
-            .collect::<FuturesUnordered<_>>();
-
-        while let Some((name, sample)) = futures.next().await {
-            let mut sample = sample?;
-            while let Some(entry) = sample.next().await {
-                out.push((name, entry?));
-            }
-        }
-
-        Ok(out)
-    }
-}
-
-impl<T> Broker<T>
-where
-    T: Sync,
-{
-    /// Send all data from a slice to all sinks.
-    ///
-    /// Returns an error for each sink that fails, along with the name of the sink. An empty output
-    /// means all sinks succeeded.
-    #[inline]
-    #[must_use]
-    pub async fn send_all_unchecked(&self, entries: &[T]) -> Box<[(&str, SendError)]> {
-        let futures = self
-            .sinks
-            .iter()
-            .map(|(name, sink)| (&**name, &**sink))
-            .chain(
-                self.connectors
-                    .iter()
-                    .map(|(name, sink)| (&**name, &**sink as &(dyn Sink<T> + Send + Sync))),
-            )
-            .map(|(name, sink)| {
-                sink.send_all(entries)
-                    .map(move |res| res.map_err(|err| (name, err)))
-            });
-        join_all(futures)
-            .await
-            .into_iter()
-            .filter_map(Result::err)
-            .collect()
-    }
-
-    /// Send a single entry to all sinks.
-    ///
-    /// Returns an error for each sink that fails, along with the name of the sink. An empty output
-    /// means all sinks succeeded.
-    #[inline]
-    #[must_use]
-    pub async fn send_one_unchecked(&self, entry: &T) -> Box<[(&str, SendError)]> {
-        let futures = self
-            .sinks
-            .iter()
-            .map(|(name, sink)| (&**name, &**sink))
-            .chain(
-                self.connectors
-                    .iter()
-                    .map(|(name, sink)| (&**name, &**sink as &(dyn Sink<T> + Send + Sync))),
-            )
-            .map(|(name, sink)| {
-                sink.send_one(entry)
-                    .map(move |res| res.map_err(|err| (name, err)))
-            });
-        join_all(futures)
-            .await
-            .into_iter()
-            .filter_map(Result::err)
-            .collect()
-    }
-}
-
-impl<T> Broker<T>
-where
-    T: Send + Eq + Hash,
-{
-    /// Fetch all data matching the query.
-    ///
-    /// Includes, for each entry, which source it came from.
-    ///
-    /// # Errors
-    ///
-    /// Fails if any source fails.
-    #[inline]
-    pub async fn fetch_all_named(
-        &mut self,
-        query: &(dyn Query<T> + Sync),
-    ) -> Result<Vec<(&str, T)>, FetchError> {
-        let min_capacity = self
-            .sources
-            .iter()
-            .map(|(name, source)| (&**name, &**source))
-            .chain(
-                self.connectors
-                    .iter()
-                    .map(|(name, source)| (&**name, &**source as &(dyn Source<T> + Send + Sync))),
-            )
-            .map(|(_, source)| source.size_hint(query).0)
-            .sum();
-        let mut out = HashSet::with_capacity(min_capacity);
-
-        for (name, per_source) in self
-            .sources
-            .iter_mut()
-            .map(|(name, source)| (&**name, &mut **source))
-            .chain(self.connectors.iter_mut().map(|(name, source)| {
-                (&**name, &mut **source as &mut (dyn Source<T> + Send + Sync))
-            }))
-            .map(|(name, source)| (name, source.fetch_all(query)))
-        {
-            out.extend(per_source.await?.into_iter().map(|entry| (&*name, entry)));
-        }
-
-        Ok(out.into_iter().collect())
     }
 }
 
@@ -272,8 +144,13 @@ where
 #[async_trait]
 impl<T> Source<T> for Broker<T>
 where
-    T: Eq + Hash + Send,
+    T: Eq + Hash + Send + 'static,
 {
+    #[inline]
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
+    }
+
     #[inline]
     async fn fetch<'s>(
         &'s mut self,
@@ -287,12 +164,7 @@ where
         let futures = self
             .sources
             .iter_mut()
-            .map(|(name, source)| (&**name, &mut **source))
-            .chain(self.connectors.iter_mut().map(|(name, source)| {
-                let source: &mut (dyn Source<T> + Send + Sync) = &mut **source;
-                (&**name, source)
-            }))
-            .map(|(_, source)| source.fetch(query))
+            .map(|source| source.1.fetch(query))
             .collect::<Vec<_>>();
         try_join_all(futures)
             .await
@@ -304,24 +176,14 @@ where
         let min_capacity = self
             .sources
             .iter()
-            .map(|(name, source)| (&**name, &**source))
-            .chain(self.connectors.iter().map(|(name, source)| {
-                let source: &(dyn Source<T> + Send + Sync) = &**source;
-                (&**name, source)
-            }))
-            .map(|(_, source)| source.size_hint(query).0)
+            .map(|source| source.1.size_hint(query).0)
             .sum();
         let mut out = HashSet::with_capacity(min_capacity);
 
         for per_source in self
             .sources
             .iter_mut()
-            .map(|(name, source)| (&**name, &mut **source))
-            .chain(self.connectors.iter_mut().map(|(name, source)| {
-                let source: &mut (dyn Source<T> + Send + Sync) = &mut **source;
-                (&**name, source)
-            }))
-            .map(|(_, source)| source.fetch_all(query))
+            .map(|source| source.1.fetch_all(query))
         {
             out.extend(per_source.await?);
         }
@@ -334,12 +196,7 @@ where
         let mut futures = self
             .sources
             .iter_mut()
-            .map(|(name, source)| (&**name, &mut **source))
-            .chain(self.connectors.iter_mut().map(|(name, source)| {
-                let source: &mut (dyn Source<T> + Send + Sync) = &mut **source;
-                (&**name, source)
-            }))
-            .map(|(_, source)| source.fetch_one(query))
+            .map(|source| source.1.fetch_one(query))
             .collect::<FuturesUnordered<_>>();
 
         // TODO: Fix this messy code.
@@ -370,12 +227,7 @@ where
         let mut futures = self
             .sources
             .iter_mut()
-            .map(|(name, source)| (&**name, &mut **source))
-            .chain(self.connectors.iter_mut().map(|(name, source)| {
-                let source: &mut (dyn Source<T> + Send + Sync) = &mut **source;
-                (&**name, source)
-            }))
-            .map(|(_, source)| source.fetch_optional(query))
+            .map(|source| source.1.fetch_optional(query))
             .collect::<FuturesUnordered<_>>();
 
         // TODO: Fix this messy code.
@@ -402,58 +254,83 @@ where
     fn size_hint(&self, query: &dyn Query<T>) -> (usize, Option<usize>) {
         self.sources
             .iter()
-            .map(|(name, source)| (&**name, &**source))
-            .chain(
-                self.connectors
-                    .iter()
-                    .map(|(name, source)| (&**name, &**source as &(dyn Source<T> + Send + Sync))),
-            )
-            .map(|(_, source)| source.size_hint(query))
-            .reduce(|(lower_acc, upper_acc), (lower, upper)| {
+            .map(|source| source.1.size_hint(query))
+            .reduce(|(lower_acc, upper_acc): (_, _), (lower, upper)| {
                 let lower = lower_acc + lower;
-                let upper = upper_acc.zip(upper).and_then(|(a, b)| a.checked_add(b));
+                let upper = upper_acc
+                    .zip(upper)
+                    .and_then(|(a, b): (_, _)| a.checked_add(b));
                 (lower, upper)
             })
             .unwrap_or_default()
     }
 }
 
-#[async_trait]
-impl<T> Sink<T> for Broker<T>
+impl<T> Broker<T>
 where
-    T: Sync,
+    T: Send + Sync + Clone + 'static,
 {
-    /// Send all data from a slice to all sinks.
+    /// Returns all sources currently registered with the broker.
     ///
-    /// Sends to each sink in a sequential fashion, stopping on first error. To run in parallell
-    /// and keep going on error, see [`send_all_unchecked`](Self::send_all_unchecked).
+    /// Sources are returned as `(name, source)` pairs, where the
+    /// name uniquely identifies the source within the broker.
+    /// The returned slice is read-only and reflects the broker's
+    /// current in-memory state.
+    #[must_use]
     #[inline]
-    async fn send_all(&self, entries: &[T]) -> Result<(), SendError> {
-        for (_, sink) in &self.sinks {
-            sink.send_all(entries).await?;
-        }
-
-        for (_, sink) in &self.connectors {
-            sink.send_all(entries).await?;
-        }
-
-        Ok(())
+    pub fn sources(&self) -> &[(String, Box<dyn Source<T> + Send>)] {
+        &self.sources
     }
 
-    /// Send a single entry to all sinks.
+    /// Adds an item to a specific named source.
     ///
-    /// Sends to each sink in a sequential fashion, stopping on first error. To run in parallell
-    /// and keep going on error, see [`send_one_unchecked`](Self::send_one_unchecked).
+    /// This method only works for sources that implement [`Sink`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The source does not exist.
+    /// - The source is not writable.
+    /// - The write operation fails.
     #[inline]
-    async fn send_one(&self, entry: &T) -> Result<(), SendError> {
-        for (_, sink) in &self.sinks {
-            sink.send_one(entry).await?;
+    pub async fn add_to_source(&mut self, name: &str, item: T) -> Result<(), SendError>
+    where
+        T: Clone + 'static,
+    {
+        for (source_name, source) in &mut self.sources {
+            if source_name == name
+                && let Some(sink) = source.as_any_mut().downcast_mut::<MemorySource<T>>()
+            {
+                return sink.send_one(&item).await;
+            }
+        }
+        Err(SendError::Rejected)
+    }
+
+    /// Fetch all items from all registered sources, including their source name.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`FetchError`] if any underlying source fails to fetch
+    /// or decode its results.
+    #[inline]
+    pub async fn fetch_all_with_source(
+        &mut self,
+        query: &(dyn Query<T> + Sync),
+    ) -> Result<Vec<SearchResult<T>>, FetchError> {
+        let mut out = Vec::new();
+
+        for (name, source) in &mut self.sources {
+            let results = source.fetch_all(query).await?;
+
+            for item in results {
+                out.push(SearchResult {
+                    item,
+                    source: name.clone(),
+                });
+            }
         }
 
-        for (_, sink) in &self.connectors {
-            sink.send_one(entry).await?;
-        }
-
-        Ok(())
+        Ok(out)
     }
 }
