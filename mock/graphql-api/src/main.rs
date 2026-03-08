@@ -48,6 +48,6 @@ async fn main() {
     let listener = TcpListener::bind(ADDRESS)
         .await
         .expect("Unable to bind ip address");
-    println!("Server's on http://127.0.0.1:8081");
+    println!("Server's on http://127.0.0.1:8081/graphql");
     serve(listener, app).await.expect("Unable to start server");
 }

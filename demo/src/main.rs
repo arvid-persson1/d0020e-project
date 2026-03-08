@@ -2,7 +2,7 @@
 #![allow(dead_code, reason = "Demo code.")]
 
 use reqwest::*;
-use serde_json::json;
+use serde_json::{Value, json};
 
 use broker::{
     Broker,
@@ -29,6 +29,22 @@ enum BookFormatType {
     Paperback,
 }
 
+// Testing it here first!
+fn body_builder(
+    (method, resolver, resolver_input, value, fields): (&str, &str, &str, &str, Vec<&str>),
+) -> Value {
+    let fields_formatted = fields.join(", ");
+    let mut query;
+    if resolver_input == "" {
+        query = format!("{method} {{ {resolver} {{ {fields_formatted} }} }}");
+    } else {
+        query = format!(
+            "{method} {{ {resolver}({resolver_input}: {value}) {{ {fields_formatted} }} }}"
+        );
+    }
+    json!({"query": query})
+}
+
 #[main]
 async fn main() -> Result<()> {
     // let mut broker = Broker::<Book>::new();
@@ -47,25 +63,18 @@ async fn main() -> Result<()> {
     // let results = broker.fetch_all(&query).await;
     // println!("results: {results:#?}");
 
-    // -- Initial test to see if things work at all --
+    // This is my home for testing for now
     let client = Client::new();
+    let temp = (
+        "query",
+        "getAllBooks",
+        "",
+        "",
+        vec!["title", "author", "isbn"],
+    );
 
-    let query = r#"
-        query {
-            getBooks(
-                filter: {format: PDF}
-            ) 
-            {title, author, isbn}
-        }
-    "#;
-
-    let variables = json!({ "id": "123" });
-
-    // NOTE: I think this is the simplest way to convert between the str arrays and json
-    let body = json!({
-        "query": query,
-        "variables": variables,
-    });
+    let body = body_builder(temp);
+    println!("Body: {}", body);
 
     let response = client
         .post("http://127.0.0.1:8081/graphql")

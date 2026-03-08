@@ -37,10 +37,9 @@ pub trait Query<T> {
     #[cfg(feature = "rest")]
     fn to_http_multi(&self) -> Option<Vec<HttpQuery<'_>>>;
 
-    /// Translate into a single ['HttpQuery'], structured for graphql api:s.
-    /// NOTE: In case I choose to use this function
-    #[cfg(feature = "graphql")]
-    fn to_grahpql_single(&self) -> Single<'_, HttpQuery<'_>, T>;
+    // NOTE: In case I choose to use this function
+    // #[cfg(feature = "graphql")]
+    // fn to_grahpql_single(&self) -> Single<'_, HttpQuery<'_>, T>;
 }
 /// A best-effort translation of the input query to a single output query.
 ///
@@ -161,3 +160,8 @@ impl<T, U: ?Sized> Field<T, U> {
 #[cfg(feature = "rest")]
 #[expect(clippy::module_name_repetitions, reason = "Established terminology.")]
 pub type HttpQuery<'a> = Vec<(&'a str, Box<str>)>;
+
+// Type for making graphql queries simpler???
+// #[cfg(feature = "graphql")]
+// #[expect(clippy::module_name_repetitions, reason = "Established terminology.")]
+// pub type GraphqlQuery<'a> = Vec<(&'a str, Box<str>)>;
