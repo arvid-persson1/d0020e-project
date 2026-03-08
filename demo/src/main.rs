@@ -58,11 +58,7 @@ pub struct DemoBookDecoder;
 // Implements PgDecode for the local Book struct
 impl PgDecode<Book> for DemoBookDecoder {
     #[inline]
-    fn decode_all(
-        &self,
-        conn: &mut PgConnection,
-        sql_text: &str,
-    ) -> Result<Vec<Book>, dslError> {
+    fn decode_all(&self, conn: &mut PgConnection, sql_text: &str) -> Result<Vec<Book>, dslError> {
         let full_query = if sql_text.trim().is_empty() {
             "SELECT * FROM books".to_owned()
         } else {
