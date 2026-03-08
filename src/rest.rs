@@ -10,7 +10,6 @@ use crate::{
 use async_trait::async_trait;
 use futures::{StreamExt as _, TryStreamExt as _, future::ready, stream::BoxStream};
 use reqwest::{Body, Client, Method, Response, Url};
-use std::any::Any;
 use std::{io::Error as IoError, marker::PhantomData};
 
 /// The [`Builder`], used to construct REST connectors more flexibly.
@@ -144,13 +143,9 @@ where
 #[async_trait]
 impl<T, D> Source<T> for ReadOnly<T, D>
 where
-    T: Send + 'static,
-    D: Decode<T> + Send + Sync + 'static,
+    T: Send,
+    D: Decode<T> + Send + Sync,
 {
-    #[inline]
-    fn as_any_mut(&mut self) -> &mut dyn Any {
-        self
-    }
     #[inline]
     async fn fetch<'s>(
         &'s mut self,
@@ -236,15 +231,11 @@ where
 #[async_trait]
 impl<T, E, D, C> Source<T> for ReadWrite<T, E, D, C>
 where
-    T: Send + Sync + 'static,
-    E: Send + Sync + 'static,
-    D: Decode<T> + Send + Sync + 'static,
-    C: Decode<T> + Send + Sync + 'static,
+    T: Send + Sync,
+    E: Send + Sync,
+    D: Decode<T> + Send + Sync,
+    C: Decode<T> + Send + Sync,
 {
-    #[inline]
-    fn as_any_mut(&mut self) -> &mut dyn Any {
-        self
-    }
     #[inline]
     async fn fetch<'s>(
         &'s mut self,
@@ -345,11 +336,11 @@ where
 #[async_trait]
 impl<T, E> Sink<T> for WriteOnly<T, E>
 where
-    T: Sync + Send,
-    E: Encode<T> + Sync + Send,
+    T: Sync,
+    E: Encode<T> + Sync,
 {
     #[inline]
-    async fn send_all(&mut self, entries: &[T]) -> Result<(), SendError> {
+    async fn send_all(&self, entries: &[T]) -> Result<(), SendError> {
         let body = self
             .encoder
             .encode_all(entries)
@@ -366,7 +357,7 @@ where
     }
 
     #[inline]
-    async fn send_one(&mut self, entry: &T) -> Result<(), SendError> {
+    async fn send_one(&self, entry: &T) -> Result<(), SendError> {
         let body = self.encoder.encode_one(entry).map_err(SendError::Encode)?;
         send_impl(
             &self.client,
@@ -383,13 +374,13 @@ where
 #[async_trait]
 impl<T, E, D, C> Sink<T> for ReadWrite<T, E, D, C>
 where
-    T: Sync + Send,
-    E: Encode<T> + Sync + Send,
-    D: Sync + Send,
-    C: Encode<T> + Sync + Send,
+    T: Sync,
+    E: Encode<T> + Sync,
+    D: Sync,
+    C: Encode<T> + Sync,
 {
     #[inline]
-    async fn send_all(&mut self, entries: &[T]) -> Result<(), SendError> {
+    async fn send_all(&self, entries: &[T]) -> Result<(), SendError> {
         let body = self.codec.encode_all(entries).map_err(SendError::Encode)?;
         send_impl(
             &self.client,
@@ -403,7 +394,7 @@ where
     }
 
     #[inline]
-    async fn send_one(&mut self, entry: &T) -> Result<(), SendError> {
+    async fn send_one(&self, entry: &T) -> Result<(), SendError> {
         let body = self.codec.encode_one(entry).map_err(SendError::Encode)?;
         send_impl(
             &self.client,
