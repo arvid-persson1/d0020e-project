@@ -14,6 +14,7 @@ use tokio::task::spawn_blocking;
 use crate::connector::{Sink, Source};
 use crate::errors::{ConnectionError, EncodeError, FetchError, FetchOneError, SendError};
 use crate::query::Query;
+use diesel::QueryResult;
 
 pub mod builder;
 pub mod models;
@@ -34,6 +35,11 @@ pub trait PgDecode<T> {
     /// Returns a `diesel::result::Error` if the database query fails or if
     /// the raw rows cannot be safely mapped to the target struct.
     fn decode_all(&self, conn: &mut PgConnection, sql_text: &str) -> Result<Vec<T>, DslError>;
+    /// Fetches a single optional record from the database.
+    ///
+    /// # Errors
+    /// Returns a `diesel::result::Error` if the database query fails.
+    fn decode_optional(&self, conn: &mut PgConnection, sql_text: &str) -> QueryResult<Option<T>>;
 }
 
 /// Postgres encode
@@ -44,7 +50,17 @@ pub trait PgEncode<T> {
     ///
     /// Returns a `diesel::result::Error` if the database insertion fails,
     /// such as from a constraint violation or network issue.
-    fn encode_all(&self, conn: &mut PgConnection, entries: &[T]) -> Result<(), DslError>;
+    fn encode_all(&self, conn: &mut PgConnection, entries: &[T]) -> QueryResult<usize>;
+    /// Inserts a single record into the database.
+    ///
+    /// # Errors
+    /// Returns a `diesel::result::Error` if the database rejects the insertion.
+    fn encode_one(&self, conn: &mut PgConnection, entry: &T) -> QueryResult<usize>;
+    /// Safely handles an optional insert.
+    ///
+    /// # Errors
+    /// Returns a `diesel::result::Error` if the database rejects the insertion.
+    fn encode_optional(&self, conn: &mut PgConnection, entry: Option<&T>) -> QueryResult<usize>;
 }
 
 /// Database connection pool
@@ -157,7 +173,7 @@ where
                 SendError::Connection(ConnectionError::Io(io_err))
             })?;
 
-            encoder
+            let _ = encoder
                 .encode_all(&mut conn, &entries_to_insert)
                 .map_err(|e| {
                     let boxed_err = Box::new(e);
@@ -249,7 +265,7 @@ where
                 SendError::Connection(ConnectionError::Io(io_err))
             })?;
 
-            encoder
+            let _ = encoder
                 .encode_all(&mut conn, &entries_to_insert)
                 .map_err(|e| {
                     let boxed_err = Box::new(e);
