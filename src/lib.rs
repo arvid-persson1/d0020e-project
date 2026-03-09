@@ -21,6 +21,15 @@ use std::any::Any;
 use std::{collections::HashSet, hash::Hash};
 use tokio as _;
 
+#[allow(
+    unused_extern_crates,
+    reason = "Our custom procedural macros (like Queryable) hardcode the `broker::` path. This alias allows those macros to compile when used internally within this crate."
+)]
+extern crate self as broker;
+
+use diesel as _;
+use diesel_derive_enum as _;
+
 pub mod errors;
 use crate::errors::{FetchError, FetchOneError};
 
@@ -35,32 +44,14 @@ pub use encode::{Codec, Decode, Encode};
 #[cfg(feature = "rest")]
 pub mod rest;
 
-use crate::connector::MemorySource;
-use connector::Source;
+#[cfg(feature = "postgres")]
+pub mod postgres;
 
-/// A trait for types that can accept and store data.
-///
-/// This extends [`Source`] so that writable sources can both
-/// provide and receive data.
-///
-/// Implementors typically represent connectors that support
-/// write operations (for example in-memory sources or REST
-/// endpoints that allow POST requests).
-#[async_trait]
-pub trait Sink<T: Send>: Source<T> {
-    /// Adds a single item to the sink.
-    ///
-    /// Returns an error if the item could not be stored.
-    async fn add(&mut self, item: T) -> Result<(), FetchError>;
-
-    /// Attempts to downcast this source to a sink.
-    ///
-    /// Returns `Some` if the underlying implementation supports
-    /// writing, otherwise `None`.
-    #[inline]
-    fn as_sink(&self) -> Option<&dyn Sink<T>> {
-        None
-    }
+/// A "full" connector; one that is both a [`Source`] and a [`Sink`].
+trait Full<T>: Source<T> + Sink<T> + Send + Sync
+where
+    T: Send + Sync,
+{
 }
 
 /// struct for sending sourcename to frontend

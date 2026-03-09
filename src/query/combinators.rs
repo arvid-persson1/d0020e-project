@@ -3,6 +3,8 @@
 //! This module defines the core query abstract syntax tree (AST) and the semantics for evaluating
 //! queries against in-memory data. Queries are composable, immutable, and evaluated recursively.
 
+#[cfg(feature = "postgres")]
+use super::SqlStatement;
 use super::{Field, Query};
 #[cfg(feature = "rest")]
 use super::{HttpQuery, Single};
@@ -96,6 +98,24 @@ impl<T> Query<T> for True {
         true
     }
 
+    #[cfg(feature = "postgres")]
+    #[inline]
+    fn to_sql_single(&self) -> Single<'_, SqlStatement, T> {
+        Single {
+            query: SqlStatement {
+                query_text: String::new(),
+                params: Vec::new(),
+            },
+            residue: Vec::new(),
+        }
+    }
+
+    #[cfg(feature = "postgres")]
+    #[inline]
+    fn to_sql_multi(&self) -> Option<Vec<SqlStatement>> {
+        Some(vec![<Self as Query<T>>::to_sql_single(self).query])
+    }
+
     /// Returns a query with no parameters and no residue.
     #[cfg(feature = "rest")]
     #[inline]
@@ -131,6 +151,24 @@ where
         getter(data) == *value
     }
 
+    #[cfg(feature = "postgres")]
+    #[inline]
+    fn to_sql_single(&self) -> Single<'_, SqlStatement, T> {
+        Single {
+            query: SqlStatement {
+                query_text: format!("{} = '{}'", self.field.name, self.value),
+                params: vec![self.value.to_string()],
+            },
+            residue: Vec::new(),
+        }
+    }
+
+    #[cfg(feature = "postgres")]
+    #[inline]
+    fn to_sql_multi(&self) -> Option<Vec<SqlStatement>> {
+        Some(vec![self.to_sql_single().query])
+    }
+
     /// Returns a query with one parameter, that being the field name and `value.to_string()`, and
     /// no residue.
     #[cfg(feature = "rest")]
@@ -157,7 +195,7 @@ where
 impl<T, U, V> Query<T> for Ne<'_, Field<T, U>, V>
 where
     U: PartialEq<V> + ?Sized,
-    V: Sync + ?Sized,
+    V: Sync + ?Sized + ToString,
 {
     #[inline]
     fn evaluate(&self, data: &T) -> bool {
@@ -166,6 +204,24 @@ where
             value,
         } = self;
         getter(data) != *value
+    }
+
+    #[cfg(feature = "postgres")]
+    #[inline]
+    fn to_sql_single(&self) -> Single<'_, SqlStatement, T> {
+        Single {
+            query: SqlStatement {
+                query_text: format!("{} != '{}'", self.field.name, self.value.to_string()),
+                params: vec![self.value.to_string()],
+            },
+            residue: Vec::new(),
+        }
+    }
+
+    #[cfg(feature = "postgres")]
+    #[inline]
+    fn to_sql_multi(&self) -> Option<Vec<SqlStatement>> {
+        Some(vec![self.to_sql_single().query])
     }
 
     /// Returns a single query with no parameters, meaning **this entire (sub)query remains as
@@ -190,7 +246,7 @@ where
 impl<T, U, V> Query<T> for Gt<'_, Field<T, U>, V>
 where
     U: PartialOrd<V> + ?Sized,
-    V: Sync + ?Sized,
+    V: Sync + ?Sized + ToString,
 {
     #[inline]
     fn evaluate(&self, data: &T) -> bool {
@@ -201,7 +257,26 @@ where
         getter(data) > *value
     }
 
-    /// Returns a single query with no parameters, meaning **this entire (sub)query remains as
+    #[cfg(feature = "postgres")]
+    #[inline]
+    fn to_sql_single(&self) -> Single<'_, SqlStatement, T> {
+        Single {
+            query: SqlStatement {
+                query_text: format!("{} > '{}'", self.field.name, self.value.to_string()),
+                params: vec![self.value.to_string()],
+            },
+            // Empty residue. Postgres handles the logic natively
+            residue: Vec::new(),
+        }
+    }
+
+    #[cfg(feature = "postgres")]
+    #[inline]
+    fn to_sql_multi(&self) -> Option<Vec<SqlStatement>> {
+        Some(vec![self.to_sql_single().query])
+    }
+
+    /// Returns a single query with no paramqters, meaning **this entire (sub)query remains as
     /// residue**.
     #[cfg(feature = "rest")]
     #[inline]
@@ -223,7 +298,7 @@ where
 impl<T, U, V> Query<T> for Lt<'_, Field<T, U>, V>
 where
     U: PartialOrd<V> + ?Sized,
-    V: Sync + ?Sized,
+    V: Sync + ?Sized + ToString,
 {
     #[inline]
     fn evaluate(&self, data: &T) -> bool {
@@ -232,6 +307,24 @@ where
             value,
         } = self;
         getter(data) < *value
+    }
+
+    #[cfg(feature = "postgres")]
+    #[inline]
+    fn to_sql_single(&self) -> Single<'_, SqlStatement, T> {
+        Single {
+            query: SqlStatement {
+                query_text: format!("{} < '{}'", self.field.name, self.value.to_string()),
+                params: vec![self.value.to_string()],
+            },
+            residue: Vec::new(),
+        }
+    }
+
+    #[cfg(feature = "postgres")]
+    #[inline]
+    fn to_sql_multi(&self) -> Option<Vec<SqlStatement>> {
+        Some(vec![self.to_sql_single().query])
     }
 
     /// Returns a single query with no parameters, meaning **this entire (sub)query remains as
@@ -262,6 +355,33 @@ where
     fn evaluate(&self, data: &T) -> bool {
         let Self(lhs, rhs) = self;
         lhs.evaluate(data) && rhs.evaluate(data)
+    }
+
+    #[cfg(feature = "postgres")]
+    #[inline]
+    fn to_sql_single(&self) -> Single<'_, SqlStatement, T> {
+        let Self(lhs, rhs) = self;
+        let mut l_single = lhs.to_sql_single();
+        let mut r_single = rhs.to_sql_single();
+
+        l_single.query.params.append(&mut r_single.query.params);
+
+        Single {
+            query: SqlStatement {
+                query_text: format!(
+                    "({}) AND ({})",
+                    l_single.query.query_text, r_single.query.query_text
+                ),
+                params: l_single.query.params,
+            },
+            residue: Vec::new(),
+        }
+    }
+
+    #[cfg(feature = "postgres")]
+    #[inline]
+    fn to_sql_multi(&self) -> Option<Vec<SqlStatement>> {
+        Some(vec![self.to_sql_single().query])
     }
 
     /// Combines both the parameter lists and the residues of both subqueries.
@@ -337,6 +457,33 @@ where
         lhs.evaluate(data) || rhs.evaluate(data)
     }
 
+    #[cfg(feature = "postgres")]
+    #[inline]
+    fn to_sql_single(&self) -> Single<'_, SqlStatement, T> {
+        let Self(lhs, rhs) = self;
+        let mut l_single = lhs.to_sql_single();
+        let mut r_single = rhs.to_sql_single();
+
+        l_single.query.params.append(&mut r_single.query.params);
+
+        Single {
+            query: SqlStatement {
+                query_text: format!(
+                    "({}) OR ({})",
+                    l_single.query.query_text, r_single.query.query_text
+                ),
+                params: l_single.query.params,
+            },
+            residue: Vec::new(),
+        }
+    }
+
+    #[cfg(feature = "postgres")]
+    #[inline]
+    fn to_sql_multi(&self) -> Option<Vec<SqlStatement>> {
+        Some(vec![self.to_sql_single().query])
+    }
+
     /// Retains only the parameters specified in both subqueries, and combines the residues.
     #[cfg(feature = "rest")]
     #[inline]
@@ -367,6 +514,33 @@ where
     fn evaluate(&self, data: &T) -> bool {
         let Self(lhs, rhs) = self;
         lhs.evaluate(data) ^ rhs.evaluate(data)
+    }
+
+    #[cfg(feature = "postgres")]
+    #[inline]
+    fn to_sql_single(&self) -> Single<'_, SqlStatement, T> {
+        let Self(lhs, rhs) = self;
+        let mut l_single = lhs.to_sql_single();
+        let mut r_single = rhs.to_sql_single();
+
+        l_single.query.params.append(&mut r_single.query.params);
+
+        Single {
+            query: SqlStatement {
+                query_text: format!(
+                    "({}) != ({})",
+                    l_single.query.query_text, r_single.query.query_text
+                ),
+                params: l_single.query.params,
+            },
+            residue: Vec::new(),
+        }
+    }
+
+    #[cfg(feature = "postgres")]
+    #[inline]
+    fn to_sql_multi(&self) -> Option<Vec<SqlStatement>> {
+        Some(vec![self.to_sql_single().query])
     }
 
     /// Retains only the parameters specified in both subqueries, and combines the residues. The
@@ -400,6 +574,27 @@ where
         !query.evaluate(data)
     }
 
+    #[cfg(feature = "postgres")]
+    #[inline]
+    fn to_sql_single(&self) -> Single<'_, SqlStatement, T> {
+        let Self(inner_query) = self;
+        let single = inner_query.to_sql_single();
+
+        Single {
+            query: SqlStatement {
+                query_text: format!("NOT ({})", single.query.query_text),
+                params: single.query.params,
+            },
+            residue: Vec::new(),
+        }
+    }
+
+    #[cfg(feature = "postgres")]
+    #[inline]
+    fn to_sql_multi(&self) -> Option<Vec<SqlStatement>> {
+        Some(vec![self.to_sql_single().query])
+    }
+
     /// Returns a single query with no parameters, meaning **this entire (sub)query remains as
     /// residue**.
     #[cfg(feature = "rest")]
@@ -430,6 +625,21 @@ where
             Self::Left(query) => query.evaluate(data),
             Self::Right(query) => query.evaluate(data),
         }
+    }
+
+    #[cfg(feature = "postgres")]
+    #[inline]
+    fn to_sql_single(&self) -> Single<'_, SqlStatement, T> {
+        match self {
+            Self::Left(query) => query.to_sql_single(),
+            Self::Right(query) => query.to_sql_single(),
+        }
+    }
+
+    #[cfg(feature = "postgres")]
+    #[inline]
+    fn to_sql_multi(&self) -> Option<Vec<SqlStatement>> {
+        Some(vec![self.to_sql_single().query])
     }
 
     #[cfg(feature = "rest")]

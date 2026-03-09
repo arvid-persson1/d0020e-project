@@ -9,41 +9,18 @@ use broker::{
     Broker,
     connector::Source as _,
     encode::json::Json,
+    encode::pg_book::BookMapper,
     encode::xml::Xml,
-    query::{
-        Queryable,
-        combinators::{And, Or},
-    },
+    postgres::{Build as _, Builder as PostgresBuilder, models::Book},
+    query::combinators::{And, Or},
     rest::{Build as _, Builder as RestBuilder},
 };
-use serde::Deserialize;
-use std::{
-    fmt::{Display, Error as FmtError, Formatter},
-    io::stdin,
-};
+use std::io::stdin;
 use tokio::main;
 
-/// Struct for book
-#[derive(Deserialize, Debug, PartialEq, Eq, Hash, Queryable)]
-struct Book {
-    /// Title
-    title: String,
-    /// Author
-    author: String,
-    /// Isbn
-    isbn: String,
-}
+use diesel as _;
 
-impl Display for Book {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), FmtError> {
-        let Self {
-            title,
-            author,
-            isbn,
-        } = self;
-        write!(f, "\"{title}\" by {author}; ISBN {isbn}")
-    }
-}
+use serde as _;
 
 #[main]
 async fn main() {
@@ -73,8 +50,23 @@ async fn main() {
                 .build(),
         ),
     );
+
     println!("Registered source (REST endpoint on 127.0.0.1:1616).");
-    println!();
+
+    //let pg_url = var("postgres://mock_reader@localhost:5632/bookery_db").expect("Failed to parse URL.");
+
+    broker.add_source(
+        "PostgresDB".into(),
+        Box::new(
+            PostgresBuilder::<Book>::new()
+                .url("postgres://mock_reader@localhost:5632/bookery_db")
+                .decoder(BookMapper)
+                .build()
+                .expect("Failed to build Postgres connector"),
+        ),
+    );
+
+    println!("Registered source postgres");
 
     let query = Book::author().eq("Jane Austen");
     println!("Defined query: {query:#?}\nPress ENTER to run.");
@@ -93,8 +85,8 @@ async fn main() {
                 println!("{book}");
             }
         },
-        Err(_) => {
-            println!("An error occurred.");
+        Err(e) => {
+            println!("An error occurred: {e:#?}");
             return;
         },
     }
@@ -120,9 +112,26 @@ async fn main() {
                 println!("{book}");
             }
         },
-        Err(_) => {
-            println!("An error occurred.");
+        Err(e) => {
+            println!("An error occurred: {e:#?}");
             return;
         },
+    }
+
+    let query_sapkowski = Book::author().eq("Andrzej Sapkowski");
+    println!("Defined query: {{query: {query_sapkowski:#?}}}");
+    println!("Press ENTER to fetch Andrzej Sapkowski (Expected from Postgres DB)...");
+    let _unused = stdin().read_line(&mut buf).expect("Failed to read line.");
+    buf.clear();
+
+    match broker.fetch_all(&query_sapkowski).await {
+        Ok(books) if books.is_empty() => println!("No books matching query."),
+        Ok(books) => {
+            println!("Found books:");
+            for book in books {
+                println!("  {book}");
+            }
+        },
+        Err(e) => println!("An error occurred: {e:#?}"),
     }
 }

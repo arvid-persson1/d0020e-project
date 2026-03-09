@@ -36,6 +36,37 @@ pub trait Query<T> {
     /// possible.
     #[cfg(feature = "rest")]
     fn to_http_multi(&self) -> Option<Vec<HttpQuery<'_>>>;
+
+    /// Translates the query combinator into a single parameterized SQL query.
+    ///
+    /// This method walks the current node of the Abstract Syntax Tree (AST) and
+    /// converts it into a database-specific `SqlStatement` (containing the raw SQL
+    /// string and safely bound parameters).
+    ///
+    /// It returns a `Single` struct which contains:
+    /// * `query`: The translated SQL statement.
+    /// * `residue`: A collection of any query conditions that could not be
+    ///   natively translated to SQL. These residual conditions must be evaluated
+    ///   in memory by the connector after the database returns the initial rows.
+    ///
+    /// For basic comparisons (like `Eq`, `Gt`, `Lt`), the database handles the
+    /// logic natively, meaning the `residue` will be empty.
+    #[cfg(feature = "postgres")]
+    fn to_sql_single(&self) -> Single<'_, SqlStatement, T>;
+
+    /// Translates the query combinator into a sequence of alternative SQL queries.
+    ///
+    /// While `to_sql_single` attempts to force the entire AST node into one
+    /// statement, `to_sql_multi` allows complex logical branches (such as `Or`
+    /// combinators) to be split into multiple, distinct SQL queries that can be
+    /// executed independently.
+    ///
+    /// Returns `Some(Vec<SqlStatement>)` if the node can be successfully split or
+    /// translated. For simple nodes (like `Eq` or `Gt`), this typically falls
+    /// back to wrapping the result of `to_sql_single` inside a single-element
+    /// vector. Returns `None` if the translation is impossible.
+    #[cfg(feature = "postgres")]
+    fn to_sql_multi(&self) -> Option<Vec<SqlStatement>>;
 }
 
 /// A best-effort translation of the input query to a single output query.
@@ -157,3 +188,23 @@ impl<T, U: ?Sized> Field<T, U> {
 #[cfg(feature = "rest")]
 #[expect(clippy::module_name_repetitions, reason = "Established terminology.")]
 pub type HttpQuery<'a> = Vec<(&'a str, Box<str>)>;
+
+#[cfg(feature = "postgres")]
+#[derive(Debug, Clone, Default)]
+/// Struct for sql queries
+pub struct SqlStatement {
+    /// Raw SQL logic string
+    pub query_text: String,
+    /// Parameters for the query
+    pub params: Vec<String>,
+}
+
+#[cfg(feature = "postgres")]
+impl SqlStatement {
+    /// Helper to create an empty SQL query
+    #[must_use]
+    #[inline]
+    pub fn new() -> Self {
+        Self::default()
+    }
+}
