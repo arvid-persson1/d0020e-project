@@ -56,7 +56,7 @@ async fn main() {
     //let pg_url = var("postgres://mock_reader@localhost:5632/bookery_db").expect("Failed to parse URL.");
 
     broker.add_source(
-        "PostgresDB".into(),
+        "PostgresDB",
         Box::new(
             PostgresBuilder::<Book>::new()
                 .url("postgres://mock_reader@localhost:5632/bookery_db")

@@ -8,7 +8,9 @@
 // Currently, `tokio` is only used by tests. It will be used more later, so instead of making
 // it a test-only dependency for the time being, this is added temporarily to suppress warnings.
 // TODO: Remove.
+use crate::connector::MemorySource;
 use crate::connector::Sink as _;
+use crate::connector::Source;
 use crate::errors::SendError;
 use async_trait::async_trait;
 use futures::{
@@ -46,13 +48,6 @@ pub mod rest;
 
 #[cfg(feature = "postgres")]
 pub mod postgres;
-
-/// A "full" connector; one that is both a [`Source`] and a [`Sink`].
-trait Full<T>: Source<T> + Sink<T> + Send + Sync
-where
-    T: Send + Sync,
-{
-}
 
 /// struct for sending sourcename to frontend
 #[derive(Debug, Clone, Serialize)]

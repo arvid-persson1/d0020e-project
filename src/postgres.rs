@@ -5,6 +5,7 @@ use diesel::PgConnection;
 use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::result::Error as DslError;
 use futures::stream::{self, BoxStream, StreamExt as _};
+use std::any::Any;
 use std::io::Error;
 use std::io::ErrorKind::ConnectionRefused;
 use std::marker::PhantomData;
@@ -108,6 +109,11 @@ where
     D: PgDecode<T> + Clone + Send + Sync + 'static,
 {
     #[inline]
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
+    }
+
+    #[inline]
     async fn fetch_all(&mut self, query: &(dyn Query<T> + Sync)) -> Result<Vec<T>, FetchError> {
         let single = query.to_sql_single();
         let sql_text = single.query.query_text;
@@ -162,7 +168,7 @@ where
     E: PgEncode<T> + Clone + Send + Sync + 'static,
 {
     #[inline]
-    async fn send_all(&self, entries: &[T]) -> Result<(), SendError> {
+    async fn send_all(&mut self, entries: &[T]) -> Result<(), SendError> {
         let pool = self.pool.clone();
         let encoder = self.encoder.clone();
         let entries_to_insert = entries.to_vec();
@@ -189,7 +195,7 @@ where
         Ok(())
     }
     #[inline]
-    async fn send_one(&self, entry: &T) -> Result<(), SendError> {
+    async fn send_one(&mut self, entry: &T) -> Result<(), SendError> {
         // Safely wrap the single entry in a slice without allocating a new Vec
         self.send_all(from_ref(entry)).await
     }
@@ -202,6 +208,11 @@ where
     D: PgDecode<T> + Clone + Send + Sync + 'static,
     E: Send + Sync + 'static,
 {
+    #[inline]
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
+    }
+
     #[inline]
     async fn fetch_all(&mut self, query: &(dyn Query<T> + Sync)) -> Result<Vec<T>, FetchError> {
         let single = query.to_sql_single();
@@ -253,7 +264,7 @@ where
     D: Send + Sync + 'static,
 {
     #[inline]
-    async fn send_all(&self, entries: &[T]) -> Result<(), SendError> {
+    async fn send_all(&mut self, entries: &[T]) -> Result<(), SendError> {
         let pool = self.pool.clone();
         let encoder = self.encoder.clone();
         let entries_to_insert = entries.to_vec();
@@ -281,7 +292,7 @@ where
         Ok(())
     }
     #[inline]
-    async fn send_one(&self, entry: &T) -> Result<(), SendError> {
+    async fn send_one(&mut self, entry: &T) -> Result<(), SendError> {
         self.send_all(from_ref(entry)).await
     }
 }
