@@ -10,6 +10,9 @@ use std::marker::PhantomData;
 pub mod json;
 pub mod xml;
 
+#[cfg(feature = "postgres")]
+pub mod pg_book;
+
 /// A type that can encode data as bytes.
 ///
 /// This trait provides several ways of encoding data regarding how many entries are processes at a
