@@ -6,6 +6,7 @@ use crate::{
 };
 use async_trait::async_trait;
 use futures::stream::{BoxStream, StreamExt as _, iter as from_iter};
+use std::any::Any;
 use std::slice::from_ref;
 
 /// A type that can provide data given some query.
@@ -19,6 +20,13 @@ pub trait Source<T>
 where
     T: Send,
 {
+    /// Returns a mutable reference for downcasting.
+    ///
+    /// This allows the broker to determine the concrete type of a
+    /// source at runtime (for example to check whether it supports
+    /// writing).
+    fn as_any_mut(&mut self) -> &mut dyn Any;
+
     /// Fetch all data matching the query as a stream.
     ///
     /// The default implementation calls [`fetch_all`](Self::fetch_all) and creates a stream from
@@ -102,11 +110,70 @@ where
     T: Sync,
 {
     /// Send all data from a slice.
-    async fn send_all(&self, entries: &[T]) -> Result<(), SendError>;
+    async fn send_all(&mut self, entries: &[T]) -> Result<(), SendError>;
 
     /// Send a single entry.
     #[inline]
-    async fn send_one(&self, entry: &T) -> Result<(), SendError> {
+    async fn send_one(&mut self, entry: &T) -> Result<(), SendError> {
         self.send_all(from_ref(entry)).await
+    }
+}
+
+/// An in-memory implementation of [`Source`] and [`Sink`].
+///
+/// This source stores all items in a local `Vec<T>`.
+/// It is primarily intended for testing or temporary runtime
+/// storage.
+#[derive(Debug)]
+pub struct MemorySource<T> {
+    /// Stored entries in memory.
+    items: Vec<T>,
+}
+
+impl<T> MemorySource<T> {
+    /// Creates a new in-memory source
+    #[must_use]
+    #[inline]
+    pub const fn new() -> Self {
+        Self { items: Vec::new() }
+    }
+}
+
+impl<T> Default for MemorySource<T> {
+    #[inline]
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[async_trait]
+impl<T> Source<T> for MemorySource<T>
+where
+    T: Send + Clone + 'static,
+{
+    #[inline]
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
+    }
+
+    #[inline]
+    async fn fetch_all(&mut self, _query: &(dyn Query<T> + Sync)) -> Result<Vec<T>, FetchError> {
+        Ok(self.items.clone())
+    }
+}
+
+/// A writable data source.
+///
+/// This trait is automatically implemented for types that
+/// implement [`Source`].
+#[async_trait]
+impl<T> Sink<T> for MemorySource<T>
+where
+    T: Sync + Clone + Send,
+{
+    #[inline]
+    async fn send_all(&mut self, entries: &[T]) -> Result<(), SendError> {
+        self.items.extend_from_slice(entries);
+        Ok(())
     }
 }
