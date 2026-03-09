@@ -270,8 +270,6 @@ where
 
     /// Adds an item to a specific named source.
     ///
-    /// This method only works for sources that implement [`Sink`].
-    ///
     /// # Errors
     ///
     /// Returns an error if:
